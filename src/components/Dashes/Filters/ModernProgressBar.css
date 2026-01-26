@@ -1,0 +1,327 @@
+/* Modern Progress Bar Design */
+/* تصميم شريط التقدم الحديث */
+
+.modern-progress-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 24px;
+  margin: 20px 0;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.modern-progress-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(255,255,255,0.1) 100%);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.modern-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.modern-progress-label {
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.modern-step-info {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.3);
+}
+
+.modern-percentage-info {
+  background: linear-gradient(45deg, #ff6b6b, #ffa500);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Modern Progress Bar */
+.modern-progress-bar-container {
+  position: relative;
+  z-index: 2;
+}
+
+.modern-progress-bar {
+  height: 8px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  backdrop-filter: blur(10px);
+}
+
+.modern-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+  border-radius: 10px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.modern-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  animation: progressShine 2s infinite;
+}
+
+@keyframes progressShine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Modern Step Icons */
+.modern-step-icons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+  position: relative;
+}
+
+.modern-step-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 3;
+  transition: all 0.3s ease;
+}
+
+.modern-step-icon:hover {
+  transform: translateY(-5px);
+}
+
+.modern-step-icon-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.modern-step-icon.completed .modern-step-icon-circle {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+}
+
+.modern-step-icon.active .modern-step-icon-circle {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  color: white;
+  animation: activePulse 1.5s infinite;
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+}
+
+.modern-step-icon.inactive .modern-step-icon-circle {
+  background: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.7);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+@keyframes activePulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  }
+  50% { 
+    transform: scale(1.15);
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+  }
+}
+
+.modern-step-icon-svg {
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.modern-step-icon.completed .modern-step-icon-svg {
+  animation: checkBounce 0.6s ease;
+}
+
+@keyframes checkBounce {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.modern-step-name {
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  transition: all 0.3s ease;
+}
+
+.modern-step-icon.completed .modern-step-name,
+.modern-step-icon.active .modern-step-name {
+  color: white;
+  font-weight: 600;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Connection Lines */
+.modern-step-icon:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 25px;
+  left: 50px;
+  width: calc(100% - 50px);
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+  z-index: 1;
+}
+
+.modern-step-icon.completed:not(:last-child)::after {
+  background: linear-gradient(90deg, #4facfe 0%, rgba(79, 172, 254, 0.3) 100%);
+  animation: lineProgress 0.8s ease;
+}
+
+@keyframes lineProgress {
+  0% { width: 0; }
+  100% { width: calc(100% - 50px); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .modern-progress-section {
+    padding: 20px;
+    margin: 15px 0;
+  }
+  
+  .modern-progress-info {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+  
+  .modern-step-icon-circle {
+    width: 45px;
+    height: 45px;
+  }
+  
+  .modern-step-icon-svg {
+    font-size: 18px;
+  }
+  
+  .modern-step-name {
+    font-size: 11px;
+  }
+  
+  .modern-step-icon:not(:last-child)::after {
+    left: 45px;
+    width: calc(100% - 45px);
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-progress-section {
+    padding: 16px;
+    border-radius: 15px;
+  }
+  
+  .modern-step-icon-circle {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .modern-step-icon-svg {
+    font-size: 16px;
+  }
+  
+  .modern-step-name {
+    font-size: 10px;
+  }
+  
+  .modern-step-icon:not(:last-child)::after {
+    left: 40px;
+    width: calc(100% - 40px);
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .modern-progress-section {
+    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+  }
+  
+  .modern-step-icon.inactive .modern-step-icon-circle {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.2);
+  }
+}
+
+/* Accessibility */
+.modern-step-icon:focus {
+  outline: 3px solid rgba(255,255,255,0.5);
+  outline-offset: 2px;
+}
+
+.modern-step-icon-circle:focus {
+  outline: none;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .modern-progress-section {
+    background: #000;
+    border: 2px solid #fff;
+  }
+  
+  .modern-step-icon.completed .modern-step-icon-circle {
+    background: #00ff00;
+    color: #000;
+  }
+  
+  .modern-step-icon.active .modern-step-icon-circle {
+    background: #ffff00;
+    color: #000;
+  }
+}

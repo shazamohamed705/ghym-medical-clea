@@ -1,0 +1,166 @@
+/* Simple and Clean Progress Bar Design */
+/* تصميم شريط التقدم البسيط والأنيق */
+
+.simple-progress-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+}
+
+/* Simple Step Icons */
+.simple-step-icons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.simple-step-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+}
+
+.simple-step-icon-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.3s ease;
+  border: 2px solid #e5e7eb;
+  background: white;
+}
+
+.simple-step-icon.completed .simple-step-icon-circle {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.simple-step-icon.active .simple-step-icon-circle {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.simple-step-icon.inactive .simple-step-icon-circle {
+  background: white;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+}
+
+.simple-step-icon-svg {
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.simple-step-name {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.simple-step-icon.completed .simple-step-name,
+.simple-step-icon.active .simple-step-name {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+/* Connection Lines Removed */
+
+/* Hover Effects */
+.simple-step-icon:hover .simple-step-icon-circle {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.simple-step-icon:hover .simple-step-name {
+  color: #3b82f6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .simple-progress-section {
+    padding: 20px;
+    margin: 15px 0;
+  }
+  
+  .simple-progress-info {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+  
+  .simple-step-icon-circle {
+    width: 45px;
+    height: 45px;
+  }
+  
+  .simple-step-icon-svg {
+    font-size: 18px;
+  }
+  
+  .simple-step-name {
+    font-size: 11px;
+  }
+  
+  /* Connection lines removed */
+}
+
+@media (max-width: 480px) {
+  .simple-progress-section {
+    padding: 16px;
+    border-radius: 8px;
+  }
+  
+  .simple-step-icon-circle {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .simple-step-icon-svg {
+    font-size: 16px;
+  }
+  
+  .simple-step-name {
+    font-size: 10px;
+  }
+  
+  /* Connection lines removed */
+}
+
+/* Focus for Accessibility */
+.simple-step-icon:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.simple-step-icon-circle:focus {
+  outline: none;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .simple-progress-section {
+    border: 2px solid #000;
+  }
+  
+  .simple-step-icon.completed .simple-step-icon-circle,
+  .simple-step-icon.active .simple-step-icon-circle {
+    background: #000;
+    border-color: #000;
+    color: #fff;
+  }
+}
