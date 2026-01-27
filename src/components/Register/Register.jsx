@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaUser, FaCheck, FaTimes, FaExclamationTriangle, FaCheckCircle } from 'react-icons/fa';
+import { FaArrowLeft, FaCheck, FaTimes } from 'react-icons/fa';
 import './GhymAuthStyles.css';
 
 const GhymAuthRegister = () => {
@@ -138,7 +138,7 @@ const GhymAuthRegister = () => {
     }
 
     // At least one special character
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       return { isValid: false, message: 'كلمة المرور يجب أن تحتوي على رمز خاص واحد على الأقل (!@#$%^&*...)' };
     }
 

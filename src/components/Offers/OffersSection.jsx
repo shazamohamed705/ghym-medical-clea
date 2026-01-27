@@ -13,10 +13,6 @@ function OffersSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const handleBookingClick = useCallback(() => {
-    navigate('/booking');
-  }, [navigate]);
-
   // استخراج العروض من بيانات API - مع memoization
   const extractOffersFromData = useCallback((clinicsData) => {
     const allOffers = [];
@@ -107,7 +103,7 @@ function OffersSection() {
     };
 
     fetchOffers();
-  }, []);
+  }, [extractOffersFromData]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50" dir="ltr">

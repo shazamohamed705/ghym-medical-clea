@@ -75,6 +75,7 @@ const ServiceDetails = () => {
   });
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingError, setBookingError] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [bookingSuccessId, setBookingSuccessId] = useState(null);
   const [showLoginPopup, setShowLoginPopup] = useState(false);
 
