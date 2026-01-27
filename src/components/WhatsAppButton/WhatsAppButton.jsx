@@ -36,12 +36,14 @@ function WhatsAppButton() {
   const handleWhatsAppClick = () => {
     const message = encodeURIComponent('مرحباً، أريد الاستفسار عن خدماتكم');
     const whatsappUrl = `https://wa.me/${contactData.whats_app_number}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+    
+    // Use window.location.href for better mobile compatibility
+    window.location.href = whatsappUrl;
   };
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-50 group cursor-pointer"
+      className="fixed bottom-20 right-6 z-50 group cursor-pointer"
       onClick={handleWhatsAppClick}
       style={{ zIndex: 9999 }}
     >

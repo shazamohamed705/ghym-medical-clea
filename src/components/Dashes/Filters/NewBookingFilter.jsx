@@ -679,7 +679,9 @@ const NewBookingFilter = ({
             const serviceName = service.title_ar || service.title || service.name;
             const message = `مرحباً، أريد حجز موعد لخدمة: ${serviceName}`;
             const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank');
+            
+            // Use window.location.href for better mobile compatibility
+            window.location.href = whatsappUrl;
             return;
           }
         }
@@ -893,7 +895,15 @@ const NewBookingFilter = ({
         {currentBookingStep === 1 && !bookingSuccess && (
           <>
             <h3 className="content-title">اختر العيادة</h3>
-            <div className="clinics-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', padding: '16px 0' }}>
+            <div 
+              className="clinics-list" 
+              style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+                gap: '12px', 
+                padding: '16px 0' 
+              }}
+            >
               {clinics.map((clinic) => {
                 // Check if this is the currently selected clinic and has data
                 const isSelected = selectedClinic === clinic.id;
@@ -1612,4 +1622,29 @@ const NewBookingFilter = ({
 };
 
 export default NewBookingFilter;
+
+// Add custom CSS for mobile responsiveness
+const styles = `
+  @media (max-width: 768px) {
+    .clinics-list {
+      grid-template-columns: 1fr !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .clinics-list {
+      grid-template-columns: 1fr !important;
+      gap: 8px !important;
+      padding: 12px 0 !important;
+    }
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
+}
 
