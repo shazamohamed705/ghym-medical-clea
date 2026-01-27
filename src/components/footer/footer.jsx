@@ -259,8 +259,9 @@ function Footer() {
             }}>روابط مهمة</h4>
             <ul className="space-y-2 text-sm opacity-90">
               <li><a href="/about" className="hover:text-white transition-colors">عن المجمع</a></li>
-              <li><a href="/privacy" className="hover:text-white transition-colors">سياسة الخصوصية</a></li>
-              <li><a href="/return-policy" className="hover:text-white transition-colors">سياسة الإرجاع</a></li>
+              <li><Link to="/privacy" className="hover:text-white transition-colors">سياسة الخصوصية</Link></li>
+              <li><Link to="/return-policy" className="hover:text-white transition-colors">سياسة الإرجاع</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors">شروط الخدمة</Link></li>
               <li><a href="/blog" className="hover:text-white transition-colors">المدونة</a></li>
               <li><a href="/contact" className="hover:text-white transition-colors">تواصل معنا</a></li>
               <li><a href="/support" className="hover:text-white transition-colors">الدعم</a></li>

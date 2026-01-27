@@ -45,7 +45,7 @@ const GhymAuthRegister = () => {
     validatePhoneNumber(value);
   };
 
-  // Function to validate phone number (Saudi format)
+  // Function to validate phone number (International format)
   const validatePhoneNumber = (phone) => {
     if (!phone) {
       setPhoneValidation({ isValid: true, message: '' });
@@ -61,11 +61,11 @@ const GhymAuthRegister = () => {
       return;
     }
 
-    // Check Saudi phone number format (starts with 9665 and 8 digits total = 12 digits)
-    if (!/^9665\d{8}$/.test(phone)) {
+    // Check international phone number format (8-15 digits)
+    if (!/^\d{8,15}$/.test(phone)) {
       setPhoneValidation({
         isValid: false,
-        message: 'يُرجى إدخال رقم هاتف سعودي صحيح (مثال: 966512345678)'
+        message: 'يُرجى إدخال رقم هاتف صحيح (8-15 رقم)'
       });
       return;
     }
@@ -313,7 +313,7 @@ const GhymAuthRegister = () => {
               name="phone"
               value={formData.phone}
               onChange={handlePhoneInput}
-              placeholder="9665XXXXXXXX"
+              placeholder="رقم الهاتف (مثال: 966501234567 أو 96522345678)"
               className={`ghym-auth-input ${!phoneValidation.isValid ? 'ghym-auth-input-error' : ''}`}
               required
               dir="ltr"

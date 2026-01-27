@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaHospital } from 'react-icons/fa';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import BannerCarousel from '../Banner/BannerCarousel';
@@ -204,7 +205,7 @@ function OffersSection() {
                     </>
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                      <div className="text-blue-500 text-4xl">🏥</div>
+                      <FaHospital className="text-blue-500 text-4xl" />
                     </div>
                   )}
 

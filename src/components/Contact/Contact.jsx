@@ -64,12 +64,12 @@ const Contact = () => {
       newErrors.email = 'البريد الإلكتروني غير صحيح';
     }
 
-    // Mobile validation
-    const mobileRegex = /^05\d{8}$/;
+    // Mobile validation - Updated to accept international numbers
+    const mobileRegex = /^[+]?[\d\s\-()]{8,15}$/;
     if (!formData.mobile.trim()) {
       newErrors.mobile = 'رقم الجوال مطلوب';
-    } else if (!mobileRegex.test(formData.mobile)) {
-      newErrors.mobile = 'رقم الجوال يجب أن يبدأ بـ 05 ويحتوي على 10 أرقام';
+    } else if (!mobileRegex.test(formData.mobile.replace(/\s/g, ''))) {
+      newErrors.mobile = 'رقم الجوال غير صحيح (يجب أن يحتوي على 8-15 رقم)';
     }
 
     // Message validation
@@ -313,7 +313,7 @@ const Contact = () => {
                   value={formData.mobile}
                   onChange={handleInputChange}
                   className={`contact-form-input ${errors.mobile ? 'error' : ''}`}
-                  placeholder={formData.mobile ? '' : '05xxxxxxxx'}
+                  placeholder={formData.mobile ? '' : 'رقم الهاتف (مثال: +966501234567)'}
                   disabled={isSubmitting}
                 />
                 {errors.mobile && (

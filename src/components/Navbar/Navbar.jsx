@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FaRocket } from 'react-icons/fa';
 
 function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -208,9 +209,12 @@ function Navbar() {
 
               {/* Additional Info */}
               <div className="mt-6 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-500" style={{ fontFamily: 'Almarai' }}>
-                  لن يستغرق الأمر سوى دقيقة واحدة! 🚀
-                </p>
+                <div className="flex items-center gap-2 justify-center">
+                  <FaRocket className="text-blue-500 text-sm" />
+                  <p className="text-xs text-gray-500" style={{ fontFamily: 'Almarai' }}>
+                    لن يستغرق الأمر سوى دقيقة واحدة!
+                  </p>
+                </div>
               </div>
             </div>
           </div>

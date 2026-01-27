@@ -15,6 +15,9 @@ import Category from './components/Category/Category';
 import ServiceDetails from './components/ServiceDetails/ServiceDetails';
 import DashboardOptimized from './components/Dashes/DashboardOptimized';
 import WhatsAppButton from './components/WhatsAppButton/WhatsAppButton';
+import Privacy from './components/Privacy/Privacy';
+import ReturnPolicy from './components/ReturnPolicy/ReturnPolicy';
+import TermsOfService from './components/TermsOfService/TermsOfService';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -57,6 +60,9 @@ function App() {
           } />
           <Route path="/category" element={<Category />} />
           <Route path="/service/:clinicId/:serviceId" element={<ServiceDetails />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/return-policy" element={<ReturnPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
         </Routes>
         
         {/* زر الواتساب الطائر - يظهر في كل الصفحات */}

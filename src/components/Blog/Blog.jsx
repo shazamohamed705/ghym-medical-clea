@@ -60,9 +60,9 @@ function Blog() {
         <div className="container mx-auto px-4">
           <div className="max-w-[1500px] mx-auto">
             {/* العنوان الرئيسي */}
-            <div className="text-center mb-12">
+            <div className="text-center mb-3 md:mb-12">
               <h2
-                className="text-2xl md:text-3xl font-bold mb-4 text-[#a6c80d]"
+                className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 text-[#a6c80d]"
                 style={{
                   fontFamily: 'Almarai',
                   fontWeight: 700,
