@@ -138,7 +138,7 @@ const GhymAuthRegister = () => {
     }
 
     // At least one special character
-    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
+if (!/[!@#$%^&*()_+=\-{}\[\]:;"'|,.<>/?]/.test(password)) {
       return { isValid: false, message: 'كلمة المرور يجب أن تحتوي على رمز خاص واحد على الأقل (!@#$%^&*...)' };
     }
 
