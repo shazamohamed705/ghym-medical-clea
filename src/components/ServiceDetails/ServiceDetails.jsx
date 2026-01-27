@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import './ServiceDetails.css';
 import { getClinicsServices } from '../../API/apiService';
 import Navbar from '../Navbar/Navbar';
@@ -25,7 +25,7 @@ const ServiceDetails = () => {
     if (!dateInput) return '';
     if (typeof dateInput === 'string') {
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) return dateInput; // already YYYY-MM-DD
-      const m = dateInput.match(/^\s*(\d{2})[\/-](\d{2})[\/-](\d{4})\s*$/);
+      const m = dateInput.match(/^\s*(\d{2})[/-](\d{2})[/-](\d{4})\s*$/);
       if (m) {
         const [, dd, mm, yyyy] = m;
         return `${yyyy}-${mm}-${dd}`;
@@ -138,7 +138,7 @@ const ServiceDetails = () => {
 
         if (result.status === 'success' && result.data && result.data.services) {
           // Find the service by serviceId
-          const service = result.data.services.find(s => s.id == serviceId);
+          const service = result.data.services.find(s => s.id === parseInt(serviceId));
 
           if (service) {
             setServiceData(service);
@@ -436,7 +436,7 @@ const ServiceDetails = () => {
             <h2>خطأ في تحميل الخدمة</h2>
             <p>{error || 'الخدمة غير موجودة'}</p>
             <button 
-              onClick={() => navigate('/services')}
+              onClick={() => navigate('/offers')}
               className="back-to-services-btn"
             >
               العودة للخدمات

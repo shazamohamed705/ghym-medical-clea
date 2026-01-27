@@ -12,8 +12,7 @@ import {
   FaStar,
   FaCheck,
   FaArrowLeft,
-  FaArrowRight,
-  FaExclamationTriangle
+  FaArrowRight
 } from 'react-icons/fa';
 import profileImage from '../../../assets/photo/service.png';
 import { hasAvailableStaff, getSalonStatusMessage, validateSalonForBooking } from '../../../utils/clinicChecker';

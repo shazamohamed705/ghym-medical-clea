@@ -89,7 +89,7 @@ function Footer() {
 
           {/* وصف المجمع */}
           <div>
-            <img src="/logoo.png" />
+            <img src="/logoo.png" alt="مجمع غيم الطبي" />
             <p
               className="text-sm opacity-90 leading-relaxed mb-6"
               style={{
