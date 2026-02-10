@@ -1,5 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getSavedLocation, sortClinicsByDistance } from '../../../utils/locationUtils';
+import { useToast } from '../../Toast/ToastManager';
+import useGeolocation from '../../../hooks/useGeolocation';
 import { 
   FaCalendarAlt, 
   FaStethoscope, 
@@ -37,12 +40,21 @@ const NewBookingFilter = ({
   setActiveFilter
 }) => {
   const { isAuthenticated } = useAuth();
+  const { latitude, longitude, address } = useGeolocation();
+  const { showSuccess, showError, showWarning } = useToast();
 
   // Clinics data fetched from API
   const [clinics, setClinics] = useState([]);
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
-  const [selectedServiceId, setSelectedServiceId] = useState(null);
+  const [selectedServiceIds, setSelectedServiceIds] = useState([]);
+  const selectedServiceIdsRef = useRef([]);
+  
+  // Update ref whenever selectedServiceIds changes
+  useEffect(() => {
+    selectedServiceIdsRef.current = selectedServiceIds;
+  }, [selectedServiceIds]);
+  
   const [selectedDoctorId, setSelectedDoctorId] = useState(null);
   const [clinicStaff, setClinicStaff] = useState([]);
   const [clinicData, setClinicData] = useState(null);
@@ -61,6 +73,18 @@ const NewBookingFilter = ({
   const [newAddress, setNewAddress] = useState('');
   const [newCity, setNewCity] = useState('');
   const [addingAddress, setAddingAddress] = useState(false);
+  
+  // Pagination state for services
+  const [currentServicePage, setCurrentServicePage] = useState(1);
+  const servicesPerPage = 10;
+  
+  // Pagination state for clinics
+  const [currentClinicPage, setCurrentClinicPage] = useState(1);
+  const clinicsPerPage = 10;
+  
+  // Pagination state for doctors
+  const [currentDoctorPage, setCurrentDoctorPage] = useState(1);
+  const doctorsPerPage = 10;
 
   useEffect(() => {
     let isMounted = true;
@@ -70,15 +94,55 @@ const NewBookingFilter = ({
         const json = await res.json();
         if (isMounted && json && json.status === 'success' && json.data && Array.isArray(json.data.data)) {
           // Map clinics to clinics structure used by UI
-          const mapped = json.data.data.map((clinic) => ({
+          let mapped = json.data.data.map((clinic) => ({
             // Use clinic_name as the selection key as requested
             id: clinic.clinic_name,
             name: clinic.clinic_name,
             nameEn: clinic.owner_name,
             location: clinic.clinic_address,
             // Keep numeric id for future payload mapping if needed
-            clinicId: clinic.id
+            clinicId: clinic.id,
+            // إضافة إحداثيات العيادة
+            latitude: clinic.clinic_lat,
+            longitude: clinic.clinic_long
           }));
+
+          // فلترة العيادات حسب allowedClinicIds من localStorage
+          const allowedClinicIdsStr = localStorage.getItem('allowedClinicIds');
+          if (allowedClinicIdsStr) {
+            try {
+              const allowedClinicIds = JSON.parse(allowedClinicIdsStr);
+              if (Array.isArray(allowedClinicIds) && allowedClinicIds.length > 0) {
+                console.log('🔒 Filtering clinics by allowed IDs from localStorage:', allowedClinicIds);
+                // تحويل IDs إلى أرقام للمقارنة
+                const allowedIds = allowedClinicIds.map(id => parseInt(id));
+                mapped = mapped.filter(clinic => allowedIds.includes(clinic.clinicId));
+                console.log('🔒 Filtered clinics count:', mapped.length);
+                
+                // مسح الـ IDs بعد الاستخدام
+                localStorage.removeItem('allowedClinicIds');
+              }
+            } catch (e) {
+              console.error('Error parsing allowedClinicIds:', e);
+              localStorage.removeItem('allowedClinicIds');
+            }
+          }
+
+          // ترتيب العيادات حسب المسافة من موقع المستخدم
+          const userLocation = getSavedLocation();
+          if (userLocation) {
+            console.log('🗺️ ترتيب العيادات حسب المسافة من موقع المستخدم');
+            mapped = sortClinicsByDistance(mapped, userLocation.latitude, userLocation.longitude);
+            
+            // إضافة معلومات المسافة للعرض
+            mapped = mapped.map(clinic => ({
+              ...clinic,
+              distanceText: clinic.distance !== undefined && clinic.distance !== Infinity 
+                ? `${clinic.distance} كم` 
+                : 'غير محدد'
+            }));
+          }
+
           setClinics(mapped);
         }
       } catch (e) {
@@ -119,8 +183,8 @@ const NewBookingFilter = ({
                         if (doctor) {
                           setSelectedDoctorId(doctor.id);
                           setSelectedDoctorName(doctor.name_ar || doctor.name);
-                          // Move to step 2 (service selection) since clinic and doctor are selected
-                          setCurrentBookingStep(2);
+                          // Move to step 3 (service selection) since clinic and doctor are selected
+                          setCurrentBookingStep(3);
                         }
                       }
                     }
@@ -147,10 +211,16 @@ const NewBookingFilter = ({
     return match ? match.clinicId : null;
   }, [selectedClinic, clinics]);
 
-  const completeBooking = async () => {
+  const completeBooking = useCallback(async () => {
+    console.log('🚀 completeBooking called!');
+    
+    // Use ref to get the latest value
+    const currentIds = selectedServiceIdsRef.current;
+    console.log('🚀 selectedServiceIds from ref:', currentIds);
+    
     try {
       if (!isAuthenticated()) {
-        alert('يرجى تسجيل الدخول أولاً');
+        showError('يرجى تسجيل الدخول أولاً');
         return;
       }
 
@@ -158,42 +228,44 @@ const NewBookingFilter = ({
       console.log('🔑 Token found:', token ? 'Yes' : 'No');
 
       if (!token) {
-        alert('يرجى تسجيل الدخول أولاً');
+        showError('يرجى تسجيل الدخول أولاً');
         return;
       }
 
       // Validate required fields
       if (!selectedClinicId) {
-        alert('يرجى اختيار عيادة صحيحة');
+        showError('يرجى اختيار عيادة صحيحة');
         return;
       }
 
-      if (!selectedServiceId) {
-        alert('يرجى اختيار خدمة');
+      console.log('🔍 Selected Service IDs:', currentIds);
+      console.log('🔍 Selected Service IDs length:', currentIds.length);
+
+      if (currentIds.length === 0) {
+        showError('يرجى اختيار خدمة واحدة على الأقل');
         return;
       }
 
-      if (!selectedDoctorId) {
-        alert('يرجى اختيار طبيب');
-        return;
-      }
+      // الدكتور اختياري - لا نحتاج للتحقق منه
+      // if (!selectedDoctorId) {
+      //   showError('يرجى اختيار طبيب');
+      //   return;
+      // }
 
-      if (!selectedDate) {
-        alert('يرجى اختيار تاريخ');
-        return;
-      }
-
-      if (!selectedTime) {
-        alert('يرجى اختيار وقت');
-        return;
-      }
+      // التاريخ اختياري - لا نحتاج للتحقق منه
+      // if (!selectedDate) {
+      //   showError('يرجى اختيار تاريخ');
+      //   return;
+      // }
 
       // First, create the booking - Match API expectations
-      const formattedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+      const formattedDate = selectedDate 
+        ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
+        : null;
 
       console.log('📊 Booking details:');
       console.log('- selectedClinicId:', selectedClinicId);
-      console.log('- selectedServiceId:', selectedServiceId);
+      console.log('- selectedServiceIds:', currentIds);
       console.log('- selectedDoctorId:', selectedDoctorId);
       console.log('- currentYear:', currentYear);
       console.log('- currentMonth:', currentMonth);
@@ -201,43 +273,100 @@ const NewBookingFilter = ({
       console.log('- selectedTime:', selectedTime);
       console.log('- formattedDate:', formattedDate);
 
-      const bookingData = {
-        clinics_id: selectedClinicId,
-        staff_id: selectedDoctorId,
-        service_id: selectedServiceId,
-        date: formattedDate,
-        time: selectedTime
-      };
+      // Create multiple bookings - one for each service with the selected doctor (if selected)
+      const bookingPromises = [];
+      
+      for (const serviceId of currentIds) {
+        const bookingData = {
+          clinics_id: selectedClinicId,
+          service_id: serviceId
+        };
 
-      console.log('📤 Creating booking with:', bookingData);
+        // إضافة staff_id فقط إذا تم اختيار دكتور
+        if (selectedDoctorId) {
+          bookingData.staff_id = selectedDoctorId;
+        }
 
-      const createResponse = await fetch('https://ghaimcenter.com/laravel/api/user/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(bookingData)
-      });
+        // إضافة التاريخ فقط إذا تم اختياره
+        if (formattedDate) {
+          bookingData.date = formattedDate;
+        }
 
-      console.log('📥 Create booking response status:', createResponse.status);
+        // إضافة services_ids فقط إذا كان هناك أكثر من خدمة (الخدمات الإضافية بعد الأولى)
+        if (currentIds.length > 1) {
+          const remainingServices = currentIds.slice(1);
+          bookingData.services_ids = remainingServices;
+        }
 
-      if (!createResponse.ok) {
-        const error = await createResponse.json();
-        alert(`خطأ في إنشاء الحجز: ${error.message || 'حدث خطأ غير متوقع'}`);
-        return;
+        // إضافة الوقت فقط إذا تم اختياره
+        if (selectedTime) {
+          bookingData.time = selectedTime;
+        }
+
+        // إضافة معلومات العنوان إذا تم اختياره
+        if (selectedAddressId === 'current_location' && latitude && longitude) {
+          bookingData.address = address || `${latitude}, ${longitude}`;
+          bookingData.latitude = latitude;
+          bookingData.longitude = longitude;
+        } else if (selectedAddressId && selectedAddressId !== 'current_location') {
+          const selectedAddress = userAddresses.find(addr => addr.id === selectedAddressId);
+          if (selectedAddress) {
+            bookingData.address = selectedAddress.address || selectedAddress.title || selectedAddress.name;
+          }
+        }
+
+        console.log('📤 Creating booking with:', bookingData);
+
+        const bookingPromise = fetch('https://ghaimcenter.com/laravel/api/user/bookings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(bookingData)
+        });
+
+        bookingPromises.push(bookingPromise);
       }
 
-      const createResult = await createResponse.json();
-      const bookingId = createResult.data?.id || createResult.booking_id;
+      // Wait for all bookings to complete
+      const responses = await Promise.all(bookingPromises);
+      
+      // Check if all bookings were successful
+      const results = [];
+      for (let i = 0; i < responses.length; i++) {
+        const response = responses[i];
+        console.log(`📥 Booking ${i + 1} response status:`, response.status);
 
-      if (!bookingId) {
-        alert('لم يتم إنشاء رقم الحجز بشكل صحيح');
+        if (!response.ok) {
+          const error = await response.json();
+          showError(`خطأ في إنشاء الحجز ${i + 1}: ${error.message || 'حدث خطأ غير متوقع'}`);
+          return;
+        }
+
+        const result = await response.json();
+        results.push(result);
+      }
+
+      // Get the first booking ID for display
+      const firstBookingId = results[0]?.data?.id || results[0]?.booking_id;
+
+      if (!firstBookingId) {
+        showError('لم يتم إنشاء رقم الحجز بشكل صحيح');
         return;
       }
 
       // Booking created successfully, show success screen
-      console.log('✅ Booking created successfully with ID:', bookingId);
+      console.log('✅ Multiple bookings created successfully. Total:', results.length);
+      
+      // عرض إشعار نجاح
+      const successMessage = currentIds.length > 1 
+        ? `تم إنشاء ${currentIds.length} حجوزات بنجاح!`
+        : 'تم إنشاء الحجز بنجاح!';
+      
+      showSuccess(successMessage, {
+        duration: 6000
+      });
       
       // Store doctor name before resetting
       console.log('🔍 Debugging doctor name retrieval:');
@@ -287,14 +416,14 @@ const NewBookingFilter = ({
       
       console.log('👨‍⚕️ Final doctor name determined:', doctorName);
       
-      setBookingId(bookingId);
+      setBookingId(firstBookingId);
       setSelectedDoctorName(doctorName);
       setBookingSuccess(true);
       
       // Reset all booking data
       setCurrentBookingStep(1);
       setSelectedClinic(null);
-      setSelectedServiceId(null);
+      setSelectedServiceIds([]);
       setSelectedDoctorId(null);
       setSelectedAddressId(null);
       setSelectedDate(null);
@@ -303,9 +432,9 @@ const NewBookingFilter = ({
       setAvailableDays({});
     } catch (error) {
       console.error('Error completing booking:', error);
-      alert('حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.');
+      showError('حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.');
     }
-  };
+  }, [selectedClinicId, selectedDoctorId, selectedDate, currentYear, currentMonth, selectedTime, selectedAddressId, userAddresses, clinicStaff, clinicData, isAuthenticated, showError, showSuccess, setBookingId, setSelectedDoctorName, setBookingSuccess, setCurrentBookingStep, setSelectedClinic, setSelectedServiceIds, setSelectedDoctorId, setSelectedAddressId, setSelectedDate, setSelectedTime, setAvailableTimes, setAvailableDays]);
 
   // Fetch services and staff when clinic changes
   useEffect(() => {
@@ -354,6 +483,17 @@ const NewBookingFilter = ({
     loadClinicData();
   }, [selectedClinicId]);
 
+  // Clear selected services when doctor changes to ensure compatibility (only in step 2)
+  useEffect(() => {
+    if (selectedDoctorId && currentBookingStep === 2) {
+      // Clear selected services when doctor changes (only during service selection step)
+      console.log('🔄 Clearing selected services because doctor changed in step 2');
+      setSelectedServiceIds([]);
+      // Reset to first page when doctor changes
+      setCurrentServicePage(1);
+    }
+  }, [selectedDoctorId, currentBookingStep]);
+
   // Fetch user addresses
   useEffect(() => {
     const fetchUserAddresses = async () => {
@@ -394,62 +534,34 @@ const NewBookingFilter = ({
   // Add new address function
   const handleAddAddress = async () => {
     if (!newAddress.trim()) {
-      alert('يرجى إدخال العنوان');
+      showWarning('يرجى إدخال العنوان');
       return;
     }
 
     if (!newCity.trim()) {
-      alert('يرجى إدخال المدينة');
+      showWarning('يرجى إدخال المدينة');
       return;
     }
 
     if (!isAuthenticated()) {
-      alert('يرجى تسجيل الدخول أولاً');
+      showError('يرجى تسجيل الدخول أولاً');
       return;
     }
 
     const token = localStorage.getItem('authToken');
     if (!token) {
-      alert('يرجى تسجيل الدخول أولاً');
+      showError('يرجى تسجيل الدخول أولاً');
       return;
     }
 
     setAddingAddress(true);
     try {
-      // Get user data from localStorage or fetch from API
-      let userData = null;
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          userData = JSON.parse(storedUser);
-        } catch (e) {
-          console.error('Error parsing user data from localStorage:', e);
-        }
-      }
-
-      // If no user data in localStorage, fetch from API
-      if (!userData) {
-        const userResponse = await fetch('https://ghaimcenter.com/laravel/api/user', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (userResponse.ok) {
-          const userResult = await userResponse.json();
-          if (userResult.status === 'success' && userResult.data) {
-            userData = userResult.data;
-            localStorage.setItem('user', JSON.stringify(userData));
-          }
-        }
-      }
-
-      // Prepare address payload like in ProfileFilter
+      // Prepare address payload with dummy data for name and mobile
       const addressPayload = {
-        name: userData?.fullname || userData?.name || '',
-        mobile: userData?.phone_number || userData?.phone || '',
+        name: 'مستخدم',
+        mobile: '0500000000',
         address: newAddress.trim(),
-        city: newCity.trim() || userData?.city || ''
+        city: newCity.trim()
       };
 
       console.log('📤 Sending address payload:', addressPayload);
@@ -498,41 +610,48 @@ const NewBookingFilter = ({
           setNewAddress('');
           setNewCity('');
           setShowAddAddressForm(false);
-          alert('تم إضافة العنوان بنجاح');
+          showSuccess('تم إضافة العنوان بنجاح');
         } else {
-          alert(result.message || 'حدث خطأ أثناء إضافة العنوان');
+          showError(result.message || 'حدث خطأ أثناء إضافة العنوان');
         }
       } else {
         const error = await response.json().catch(() => ({ message: 'حدث خطأ أثناء إضافة العنوان' }));
-        alert(error.message || 'حدث خطأ أثناء إضافة العنوان');
+        showError(error.message || 'حدث خطأ أثناء إضافة العنوان');
       }
     } catch (error) {
       console.error('Error adding address:', error);
-      alert('حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.');
+      showError('حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.');
     } finally {
       setAddingAddress(false);
     }
   };
 
   // Function to check availability for a specific day
-  const checkDayAvailability = async (day, month, year, clinicId, doctorId, serviceId) => {
+  const checkDayAvailability = async (day, month, year, clinicId, doctorId, servicesIds) => {
     try {
       const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${clinicId}?staff_id=${doctorId}&date=${dateString}&service_id=${serviceId}`;
+      
+      let url;
+      if (servicesIds.length === 1) {
+        // Single service - use service_id parameter
+        url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${clinicId}?staff_id=${doctorId}&date=${dateString}&service_id=${servicesIds[0]}`;
+      } else {
+        // Multiple services - use first service as service_id and rest as services_ids
+        const firstServiceId = servicesIds[0];
+        const remainingServices = servicesIds.slice(1).join(',');
+        url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${clinicId}?staff_id=${doctorId}&date=${dateString}&service_id=${firstServiceId}&services_ids=${remainingServices}`;
+      }
 
       const response = await fetch(url);
       if (response.ok) {
         const result = await response.json();
         if (result.status === 'success' && result.data && Object.keys(result.data).length > 0) {
-          console.log(`Day ${day} (${dateString}) has ${Object.keys(result.data).length} available times`);
           return true; // Day has available times
         }
       } else if (response.status === 422) {
         // 422 means the date is invalid or not available - treat as unavailable
-        console.log(`Day ${day} (${dateString}) is not available (422)`);
         return false;
       } else {
-        console.log(`Day ${day} (${dateString}) returned status ${response.status}`);
         return false;
       }
       return false; // Day has no available times
@@ -545,7 +664,7 @@ const NewBookingFilter = ({
   // Fetch availability for all days in current month when doctor and service are selected
   useEffect(() => {
     const fetchMonthAvailability = async () => {
-      if (!selectedDoctorId || !selectedServiceId || !selectedClinic) {
+      if (!selectedDoctorId || selectedServiceIds.length === 0 || !selectedClinic) {
         setAvailableDays({});
         return;
       }
@@ -570,8 +689,10 @@ const NewBookingFilter = ({
           : 1;
 
         for (let day = startDay; day <= daysInMonth; day++) {
+          // Check availability for the selected doctor and all selected services
+          
           availabilityPromises.push(
-            checkDayAvailability(day, currentMonth, currentYear, selectedClinicId, selectedDoctorId, selectedServiceId)
+            checkDayAvailability(day, currentMonth, currentYear, selectedClinicId, selectedDoctorId, selectedServiceIds)
           );
         }
 
@@ -584,7 +705,6 @@ const NewBookingFilter = ({
         });
 
         setAvailableDays(availabilityMap);
-        console.log('Month availability loaded:', availabilityMap);
       } catch (error) {
         console.error('Error fetching month availability:', error);
         setAvailableDays({});
@@ -594,13 +714,13 @@ const NewBookingFilter = ({
     };
 
     fetchMonthAvailability();
-  }, [selectedDoctorId, selectedServiceId, selectedClinic, currentMonth, currentYear, clinics]);
+  }, [selectedDoctorId, selectedServiceIds, selectedClinic, currentMonth, currentYear, clinics]);
 
   // Fetch available times when date, doctor, and service are selected
   useEffect(() => {
     const fetchAvailableTimes = async () => {
       // Check if all required data is available
-      if (!selectedDate || !selectedDoctorId || !selectedServiceId || !selectedClinic) {
+      if (!selectedDate || !selectedDoctorId || selectedServiceIds.length === 0 || !selectedClinic) {
         setAvailableTimes([]);
         setSelectedTime(null);
         return;
@@ -611,30 +731,30 @@ const NewBookingFilter = ({
         // Format date as YYYY-MM-DD
         const dateString = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
         
-        // Build API URL with dynamic values
-        console.log('selectedClinic value:', selectedClinic, 'type:', typeof selectedClinic);
-        console.log('selectedDoctorId:', selectedDoctorId, 'type:', typeof selectedDoctorId);
-        console.log('selectedServiceId:', selectedServiceId, 'type:', typeof selectedServiceId);
-        console.log('dateString:', dateString);
-
         // Get the numeric clinic ID from the selected clinic name
         const selectedClinicId = clinics.find(clinic => clinic.id === selectedClinic)?.clinicId;
-        console.log('selectedClinicId:', selectedClinicId);
 
         if (!selectedClinicId) {
-          console.log('No clinic ID found for selected clinic:', selectedClinic);
           setAvailableTimes([]);
           return;
         }
 
-        const url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${selectedClinicId}?staff_id=${selectedDoctorId}&date=${dateString}&service_id=${selectedServiceId}`;
+        // Use all selected services for time availability
+        let url;
+        if (selectedServiceIds.length === 1) {
+          // Single service - use service_id parameter
+          url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${selectedClinicId}?staff_id=${selectedDoctorId}&date=${dateString}&service_id=${selectedServiceIds[0]}`;
+        } else {
+          // Multiple services - use first service as service_id and rest as services_ids
+          const firstServiceId = selectedServiceIds[0];
+          const remainingServices = selectedServiceIds.slice(1).join(',');
+          url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${selectedClinicId}?staff_id=${selectedDoctorId}&date=${dateString}&service_id=${firstServiceId}&services_ids=${remainingServices}`;
+        }
         
-        console.log('Fetching available times from:', url);
         const response = await fetch(url);
         
         if (response.ok) {
           const result = await response.json();
-          console.log('Available times response:', result);
           
           if (result.status === 'success' && result.data) {
             // Convert the times object to array format
@@ -643,12 +763,10 @@ const NewBookingFilter = ({
               value: value
             }));
             setAvailableTimes(timesArray);
-            console.log('Available times loaded:', timesArray);
           } else {
             setAvailableTimes([]);
           }
         } else {
-          console.log('Failed to fetch available times');
           setAvailableTimes([]);
         }
       } catch (error) {
@@ -660,10 +778,13 @@ const NewBookingFilter = ({
     };
 
     fetchAvailableTimes();
-  }, [selectedDate, selectedDoctorId, selectedServiceId, selectedClinic, currentMonth, currentYear, clinics]);
+  }, [selectedDate, selectedDoctorId, selectedServiceIds, selectedClinic, currentMonth, currentYear, clinics]);
 
   // Handle service selection with booking_cycle check
   const handleServiceSelection = async (service) => {
+    console.log('🔵 handleServiceSelection called for service:', service.id, service.name);
+    console.log('🔵 Current selectedServiceIds:', selectedServiceIds);
+    
     // Check booking_cycle first
     if (service.booking_cycle !== 1) {
       // Redirect to WhatsApp booking
@@ -689,16 +810,139 @@ const NewBookingFilter = ({
       }
       
       // Fallback if WhatsApp data not available
-      alert('يرجى التواصل معنا عبر الهاتف لحجز هذه الخدمة');
+      showWarning('يرجى التواصل معنا عبر الهاتف لحجز هذه الخدمة');
       return;
     }
 
     // Normal service selection for booking_cycle = 1
-    setSelectedServiceId(service.id);
+    const isSelected = selectedServiceIds.includes(service.id);
+    console.log('🔵 isSelected:', isSelected);
+    
+    if (isSelected) {
+      // Remove from selection
+      console.log('🔴 Removing service from selection');
+      setSelectedServiceIds(prev => {
+        const newIds = prev.filter(id => id !== service.id);
+        console.log('🔴 New selectedServiceIds after removal:', newIds);
+        return newIds;
+      });
+    } else {
+      // Add to selection
+      console.log('🟢 Adding service to selection');
+      setSelectedServiceIds(prev => {
+        const newIds = [...prev, service.id];
+        console.log('🟢 New selectedServiceIds after addition:', newIds);
+        return newIds;
+      });
+    }
   };
+  
+  // Filter doctors based on available services
+  const availableDoctors = useMemo(() => {
+    if (!clinicStaff || clinicStaff.length === 0) return [];
+    if (!services || services.length === 0) return clinicStaff;
+    
+    // إذا تم اختيار خدمات، نفلتر الدكاترة بناءً على الخدمات المختارة
+    if (selectedServiceIds.length > 0) {
+      const staffIdsForSelectedServices = new Set();
+      
+      // نجمع IDs الدكاترة من الخدمات المختارة فقط
+      services.forEach(service => {
+        // نتحقق إذا كانت الخدمة من الخدمات المختارة
+        if (selectedServiceIds.includes(service.id)) {
+          if (service.staffs && service.staffs !== null && service.staffs !== '') {
+            // If staffs is a string, parse it as comma-separated or dash-separated IDs
+            if (typeof service.staffs === 'string') {
+              const separator = service.staffs.includes(',') ? ',' : '-';
+              const staffIds = service.staffs.split(separator).map(id => parseInt(id.trim()));
+              staffIds.forEach(id => staffIdsForSelectedServices.add(id));
+            }
+            // If staffs is a number
+            else if (typeof service.staffs === 'number') {
+              staffIdsForSelectedServices.add(service.staffs);
+            }
+            // If staffs is an array
+            else if (Array.isArray(service.staffs)) {
+              service.staffs.forEach(staff => {
+                const staffId = typeof staff === 'object' ? staff.id : staff;
+                staffIdsForSelectedServices.add(parseInt(staffId));
+              });
+            }
+          }
+        }
+      });
+      
+      // نرجع فقط الدكاترة اللي بيقدموا الخدمات المختارة
+      return clinicStaff.filter(staff => staffIdsForSelectedServices.has(staff.id));
+    }
+    
+    // إذا لم يتم اختيار خدمات، نعرض كل الدكاترة المتاحين في أي خدمة
+    const staffIdsInServices = new Set();
+    
+    services.forEach(service => {
+      if (service.staffs && service.staffs !== null && service.staffs !== '') {
+        // If staffs is a string, parse it as comma-separated or dash-separated IDs
+        if (typeof service.staffs === 'string') {
+          const separator = service.staffs.includes(',') ? ',' : '-';
+          const staffIds = service.staffs.split(separator).map(id => parseInt(id.trim()));
+          staffIds.forEach(id => staffIdsInServices.add(id));
+        }
+        // If staffs is a number
+        else if (typeof service.staffs === 'number') {
+          staffIdsInServices.add(service.staffs);
+        }
+        // If staffs is an array
+        else if (Array.isArray(service.staffs)) {
+          service.staffs.forEach(staff => {
+            const staffId = typeof staff === 'object' ? staff.id : staff;
+            staffIdsInServices.add(parseInt(staffId));
+          });
+        }
+      }
+    });
+    
+    // Filter clinic staff to only include doctors that are in services
+    return clinicStaff.filter(staff => staffIdsInServices.has(staff.id));
+  }, [clinicStaff, services, selectedServiceIds]);
+  
   const bookingServicesFromApi = useMemo(() => {
     if (!services || services.length === 0) return [];
-    return services.map((srv) => ({
+    
+    // Filter services based on selected doctor
+    let filteredServices = services;
+    
+    if (selectedDoctorId) {
+      filteredServices = services.filter(srv => {
+        // If staffs is null or empty, this service is NOT available (hide it)
+        if (!srv.staffs || srv.staffs === null || srv.staffs === '') {
+          return false;
+        }
+        
+        // If staffs is a string, parse it as comma-separated or dash-separated IDs
+        if (typeof srv.staffs === 'string') {
+          const separator = srv.staffs.includes(',') ? ',' : '-';
+          const staffIds = srv.staffs.split(separator).map(id => parseInt(id.trim()));
+          return staffIds.includes(parseInt(selectedDoctorId));
+        }
+        
+        // If staffs is a number, check if it matches
+        if (typeof srv.staffs === 'number') {
+          return srv.staffs === parseInt(selectedDoctorId);
+        }
+        
+        // If staffs is an array, check if doctor ID is included
+        if (Array.isArray(srv.staffs)) {
+          return srv.staffs.some(staff => {
+            const staffId = typeof staff === 'object' ? staff.id : staff;
+            return parseInt(staffId) === parseInt(selectedDoctorId);
+          });
+        }
+        
+        return false;
+      });
+    }
+    
+    return filteredServices.map((srv) => ({
       id: srv.id,
       name: srv.title_ar || srv.title || 'خدمة',
       subtitle: srv.title_en || '',
@@ -709,7 +953,28 @@ const NewBookingFilter = ({
       rating: 4.5,
       discount: srv.discount ? `خصم ${srv.discount}%` : undefined
     }));
-  }, [services, selectedClinic]);
+  }, [services, selectedClinic, selectedDoctorId]);
+
+  // Calculate paginated services
+  const totalServices = bookingServicesFromApi.length;
+  const totalPages = Math.ceil(totalServices / servicesPerPage);
+  const startIndex = (currentServicePage - 1) * servicesPerPage;
+  const endIndex = startIndex + servicesPerPage;
+  const paginatedServices = bookingServicesFromApi.slice(startIndex, endIndex);
+
+  // Calculate paginated clinics
+  const totalClinics = clinics.length;
+  const totalClinicPages = Math.ceil(totalClinics / clinicsPerPage);
+  const clinicStartIndex = (currentClinicPage - 1) * clinicsPerPage;
+  const clinicEndIndex = clinicStartIndex + clinicsPerPage;
+  const paginatedClinics = clinics.slice(clinicStartIndex, clinicEndIndex);
+
+  // Calculate paginated doctors
+  const totalDoctors = availableDoctors.length;
+  const totalDoctorPages = Math.ceil(totalDoctors / doctorsPerPage);
+  const doctorStartIndex = (currentDoctorPage - 1) * doctorsPerPage;
+  const doctorEndIndex = doctorStartIndex + doctorsPerPage;
+  const paginatedDoctors = availableDoctors.slice(doctorStartIndex, doctorEndIndex);
 
   // Services data
   const bookingServices = [
@@ -852,7 +1117,7 @@ const NewBookingFilter = ({
                   <FaHeadphones className="simple-step-icon-svg" />
                 )}
               </div>
-              <span className="simple-step-name">الخدمة</span>
+              <span className="simple-step-name">الخدمات</span>
             </div>
             <div className={`simple-step-icon ${currentBookingStep > 3 ? 'completed' : currentBookingStep === 3 ? 'active' : 'inactive'}`}>
               <div className="simple-step-icon-circle">
@@ -895,15 +1160,9 @@ const NewBookingFilter = ({
           <>
             <h3 className="content-title">اختر العيادة</h3>
             <div 
-              className="clinics-list" 
-              style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
-                gap: '12px', 
-                padding: '16px 0' 
-              }}
+              className="clinics-list clinics-grid"
             >
-              {clinics.map((clinic) => {
+              {paginatedClinics.map((clinic) => {
                 // Check if this is the currently selected clinic and has data
                 const isSelected = selectedClinic === clinic.id;
                 const currentClinicData = isSelected ? clinicData : null;
@@ -983,6 +1242,113 @@ const NewBookingFilter = ({
                 );
               })}
             </div>
+            
+            {/* Clinic Pagination Controls */}
+            {totalClinicPages > 1 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '24px',
+                paddingTop: '16px',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                {/* Previous Button */}
+                <button
+                  onClick={() => setCurrentClinicPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentClinicPage === 1}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    background: currentClinicPage === 1 ? '#f3f4f6' : 'white',
+                    color: currentClinicPage === 1 ? '#9ca3af' : '#374151',
+                    cursor: currentClinicPage === 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <FaArrowRight style={{ fontSize: '12px' }} />
+                  السابق
+                </button>
+
+                {/* Page Numbers */}
+                <div style={{
+                  display: 'flex',
+                  gap: '4px',
+                  alignItems: 'center'
+                }}>
+                  {Array.from({ length: totalClinicPages }, (_, i) => i + 1).map(pageNum => {
+                    const showPage = 
+                      pageNum === 1 || 
+                      pageNum === totalClinicPages || 
+                      Math.abs(pageNum - currentClinicPage) <= 1;
+                    
+                    const showEllipsisBefore = pageNum === currentClinicPage - 2 && currentClinicPage > 3;
+                    const showEllipsisAfter = pageNum === currentClinicPage + 2 && currentClinicPage < totalClinicPages - 2;
+
+                    if (showEllipsisBefore || showEllipsisAfter) {
+                      return (
+                        <span key={pageNum} style={{ padding: '0 4px', color: '#9ca3af' }}>
+                          ...
+                        </span>
+                      );
+                    }
+
+                    if (!showPage) return null;
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentClinicPage(pageNum)}
+                        style={{
+                          minWidth: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
+                          border: pageNum === currentClinicPage ? 'none' : '1px solid #d1d5db',
+                          background: pageNum === currentClinicPage ? '#0ea5e9' : 'white',
+                          color: pageNum === currentClinicPage ? 'white' : '#374151',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: pageNum === currentClinicPage ? '600' : '500',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={() => setCurrentClinicPage(prev => Math.min(totalClinicPages, prev + 1))}
+                  disabled={currentClinicPage === totalClinicPages}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    background: currentClinicPage === totalClinicPages ? '#f3f4f6' : 'white',
+                    color: currentClinicPage === totalClinicPages ? '#9ca3af' : '#374151',
+                    cursor: currentClinicPage === totalClinicPages ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  التالي
+                  <FaArrowLeft style={{ fontSize: '12px' }} />
+                </button>
+              </div>
+            )}
           </>
         )}
 
@@ -992,7 +1358,7 @@ const NewBookingFilter = ({
             <div className="booking-success-icon">
               <FaCheck />
             </div>
-            <h2 className="booking-success-title">تم الحجز بنجاح!</h2>
+            <h2 className="booking-success-title">تم إنشاء الحجوزات بنجاح!</h2>
             <p className="booking-success-subtitle">
               مع {selectedDoctorName}
             </p>
@@ -1000,7 +1366,12 @@ const NewBookingFilter = ({
               <div className="booking-id-icon">
                 <FaCheck />
               </div>
-              <span className="booking-id-text">رقم الحجز: #{bookingId}</span>
+              <span className="booking-id-text">
+                {selectedServiceIds.length > 1 
+                  ? `تم إنشاء ${selectedServiceIds.length} حجز` 
+                  : `رقم الحجز: #${bookingId}`
+                }
+              </span>
             </div>
             <button 
               className="booking-success-btn"
@@ -1009,7 +1380,7 @@ const NewBookingFilter = ({
                 setBookingId(null);
                 setCompletionOtp('');
                 setSelectedDoctorName('');
-                setActiveFilter('الرئيسية');
+                setActiveFilter('لوحة التحكم الرئيسية');
               }}
             >
               العودة للرئيسية
@@ -1017,21 +1388,279 @@ const NewBookingFilter = ({
           </div>
         )}
 
+        {/* Step 3: Choose Doctor */}
+        {currentBookingStep === 3 && (
+          <>
+            <h3 className="content-title">
+              اختر الطبيب (اختياري)
+            </h3>
+            <p style={{ 
+              textAlign: 'center', 
+              color: '#6b7280', 
+              fontSize: '14px', 
+              marginBottom: '16px',
+              background: '#f8fafc',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              يمكنك اختيار طبيب أو تخطي هذه الخطوة
+            </p>
+            {availableDoctors.length > 0 ? (
+            <>
+            <div className="clinics-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', padding: '16px 0' }}>
+                {paginatedDoctors.map((staff) => (
+                  <div 
+                    key={staff.id}
+                    className={`clinic-card ${selectedDoctorId === staff.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedDoctorId(staff.id);
+                    }}
+                  style={{
+                    background: 'white',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                      border: selectedDoctorId === staff.id ? '2px solid #e5e7eb' : '1px solid #f3f4f6',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    minHeight: '60px'
+                  }}
+                >
+                  <div className="clinic-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                    <div style={{ 
+                      width: '32px', 
+                      height: '32px', 
+                      borderRadius: '50%', 
+                      background: '#f0f9ff', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      color: '#0ea5e9',
+                      fontSize: '14px'
+                    }}>
+                      <FaStethoscope />
+                    </div>
+                    <div className="clinic-details" style={{ flex: 1 }}>
+                      <h4 className="clinic-name" style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
+                          {staff.name || staff.name_ar || 'طبيب'}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="clinic-radio" style={{ marginLeft: '8px' }}>
+                    <input 
+                      type="radio" 
+                      name="doctor" 
+                        checked={selectedDoctorId === staff.id}
+                        onChange={() => {
+                          setSelectedDoctorId(staff.id);
+                        }}
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Doctor Pagination Controls */}
+            {totalDoctorPages > 1 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '24px',
+                paddingTop: '16px',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                {/* Previous Button */}
+                <button
+                  onClick={() => setCurrentDoctorPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentDoctorPage === 1}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    background: currentDoctorPage === 1 ? '#f3f4f6' : 'white',
+                    color: currentDoctorPage === 1 ? '#9ca3af' : '#374151',
+                    cursor: currentDoctorPage === 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <FaArrowRight style={{ fontSize: '12px' }} />
+                  السابق
+                </button>
+
+                {/* Page Numbers */}
+                <div style={{
+                  display: 'flex',
+                  gap: '4px',
+                  alignItems: 'center'
+                }}>
+                  {Array.from({ length: totalDoctorPages }, (_, i) => i + 1).map(pageNum => {
+                    const showPage = 
+                      pageNum === 1 || 
+                      pageNum === totalDoctorPages || 
+                      Math.abs(pageNum - currentDoctorPage) <= 1;
+                    
+                    const showEllipsisBefore = pageNum === currentDoctorPage - 2 && currentDoctorPage > 3;
+                    const showEllipsisAfter = pageNum === currentDoctorPage + 2 && currentDoctorPage < totalDoctorPages - 2;
+
+                    if (showEllipsisBefore || showEllipsisAfter) {
+                      return (
+                        <span key={pageNum} style={{ padding: '0 4px', color: '#9ca3af' }}>
+                          ...
+                        </span>
+                      );
+                    }
+
+                    if (!showPage) return null;
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentDoctorPage(pageNum)}
+                        style={{
+                          minWidth: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
+                          border: pageNum === currentDoctorPage ? 'none' : '1px solid #d1d5db',
+                          background: pageNum === currentDoctorPage ? '#0ea5e9' : 'white',
+                          color: pageNum === currentDoctorPage ? 'white' : '#374151',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: pageNum === currentDoctorPage ? '600' : '500',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={() => setCurrentDoctorPage(prev => Math.min(totalDoctorPages, prev + 1))}
+                  disabled={currentDoctorPage === totalDoctorPages}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    background: currentDoctorPage === totalDoctorPages ? '#f3f4f6' : 'white',
+                    color: currentDoctorPage === totalDoctorPages ? '#9ca3af' : '#374151',
+                    cursor: currentDoctorPage === totalDoctorPages ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  التالي
+                  <FaArrowLeft style={{ fontSize: '12px' }} />
+                </button>
+              </div>
+            )}
+            </>
+            ) : (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '2rem', 
+                color: '#6b7280',
+                backgroundColor: '#f9fafb',
+                borderRadius: '8px',
+                margin: '16px 0'
+              }}>
+                <FaStethoscope style={{ fontSize: '2rem', marginBottom: '1rem', color: '#d1d5db' }} />
+                <p style={{ margin: '0', fontSize: '16px' }}>
+                  لا يوجد أطباء متاحين في هذه العيادة حالياً
+                </p>
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', color: '#9ca3af' }}>
+                  يرجى اختيار عيادة أخرى أو المحاولة لاحقاً
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Step 2: Choose Service */}
         {currentBookingStep === 2 && (
           <>
             <div className="ghym-srv-scope-1">
-              <h3 className="content-title ghym-srv-title">اختر الخدمة</h3>
+              <h3 className="content-title ghym-srv-title">
+                اختر الخدمات 
+                {(() => {
+                  console.log('📊 Rendering service counter. selectedServiceIds:', selectedServiceIds);
+                  console.log('📊 selectedServiceIds.length:', selectedServiceIds.length);
+                  return selectedServiceIds.length > 0 && (
+                    <span style={{ 
+                      color: '#0ea5e9', 
+                      fontSize: '14px', 
+                      fontWeight: 'normal',
+                      marginRight: '8px'
+                    }}>
+                      ({selectedServiceIds.length} محدد)
+                    </span>
+                  );
+                })()}
+              </h3>
+              <p style={{ 
+                textAlign: 'center', 
+                color: '#6b7280', 
+                fontSize: '14px', 
+                marginBottom: '16px',
+                background: '#f8fafc',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                يمكنك اختيار أكثر من خدمة واحدة
+              </p>
+              
+              {/* Message when no services available for selected doctor */}
+              {selectedDoctorId && bookingServicesFromApi.length === 0 && (
+                <div style={{
+                  background: '#fef2f2',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginBottom: '16px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ 
+                    margin: '0', 
+                    fontSize: '14px', 
+                    color: '#dc2626' 
+                  }}>
+                    لا توجد خدمات متاحة للطبيب المختار. يرجى اختيار طبيب آخر.
+                  </p>
+                </div>
+              )}
+              
               <div className="clinics-list ghym-srv-services-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', padding: '16px 0' }}>
-                {(bookingServicesFromApi.length > 0 ? bookingServicesFromApi : bookingServices).map((service) => {
+                {paginatedServices.map((service) => {
                   // Get the original service data for booking_cycle check
                   const originalService = services.find(s => s.id === service.id) || service;
                   
                   return (
                   <div 
                     key={service.id}
-                    className={`clinic-card ghym-srv-card ${selectedServiceId === service.id ? 'selected' : ''}`}
-                    onClick={() => handleServiceSelection(originalService)}
+                    className={`clinic-card ghym-srv-card ${selectedServiceIds.includes(service.id) ? 'selected' : ''}`}
+                    onClick={(e) => {
+                      // Only handle click if not clicking on checkbox
+                      if (e.target.type !== 'checkbox') {
+                        handleServiceSelection(originalService);
+                      }
+                    }}
                     style={{
                       background: 'white',
                       borderRadius: '12px',
@@ -1076,109 +1705,137 @@ const NewBookingFilter = ({
                         </p>
                       </div>
                     </div>
-                    <div className="clinic-radio" style={{ marginLeft: '16px' }}>
+                    <div className="clinic-checkbox" style={{ marginLeft: '16px' }}>
                       <input 
-                        type="radio" 
+                        type="checkbox" 
                         name="service" 
-                        checked={selectedServiceId === service.id}
-                        onChange={() => handleServiceSelection(originalService)}
-                        style={{ width: '20px', height: '20px' }}
+                        checked={selectedServiceIds.includes(service.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleServiceSelection(originalService);
+                        }}
+                        style={{ 
+                          width: '20px', 
+                          height: '20px',
+                          accentColor: '#3B82F6',
+                          cursor: 'pointer'
+                        }}
                       />
                     </div>
                   </div>
                   );
                 })}
               </div>
-            </div>
-          </>
-        )}
-
-        {/* Step 3: Choose Doctor */}
-        {currentBookingStep === 3 && (
-          <>
-            <h3 className="content-title">اختر الطبيب</h3>
-            {clinicStaff.length > 0 ? (
-            <div className="clinics-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', padding: '16px 0' }}>
-                {clinicStaff.map((staff) => (
-                  <div 
-                    key={staff.id}
-                    className={`clinic-card ${selectedDoctorId === staff.id ? 'selected' : ''}`}
-                    onClick={() => {
-                      console.log('🔘 Doctor selected:', staff);
-                      console.log('🔘 Setting selectedDoctorId to:', staff.id);
-                      setSelectedDoctorId(staff.id);
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '24px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  {/* Previous Button */}
+                  <button
+                    onClick={() => setCurrentServicePage(prev => Math.max(1, prev - 1))}
+                    disabled={currentServicePage === 1}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      background: currentServicePage === 1 ? '#f3f4f6' : 'white',
+                      color: currentServicePage === 1 ? '#9ca3af' : '#374151',
+                      cursor: currentServicePage === 1 ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s'
                     }}
-                  style={{
-                    background: 'white',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                      border: selectedDoctorId === staff.id ? '2px solid #e5e7eb' : '1px solid #f3f4f6',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
+                  >
+                    <FaArrowRight style={{ fontSize: '12px' }} />
+                    السابق
+                  </button>
+
+                  {/* Page Numbers */}
+                  <div style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    minHeight: '60px'
-                  }}
-                >
-                  <div className="clinic-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                    <div style={{ 
-                      width: '32px', 
-                      height: '32px', 
-                      borderRadius: '50%', 
-                      background: '#f0f9ff', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      color: '#0ea5e9',
-                      fontSize: '14px'
-                    }}>
-                      <FaStethoscope />
-                    </div>
-                    <div className="clinic-details" style={{ flex: 1 }}>
-                      <h4 className="clinic-name" style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
-                          {staff.name || staff.name_ar || 'طبيب'}
-                      </h4>
-                      <p className="clinic-location" style={{ margin: '0', fontSize: '12px', color: '#6b7280' }}>
-                          {staff.specialty || staff.specialty_ar || 'تخصص غير محدد'}
-                      </p>
-                    </div>
+                    gap: '4px',
+                    alignItems: 'center'
+                  }}>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage = 
+                        pageNum === 1 || 
+                        pageNum === totalPages || 
+                        Math.abs(pageNum - currentServicePage) <= 1;
+                      
+                      // Show ellipsis
+                      const showEllipsisBefore = pageNum === currentServicePage - 2 && currentServicePage > 3;
+                      const showEllipsisAfter = pageNum === currentServicePage + 2 && currentServicePage < totalPages - 2;
+
+                      if (showEllipsisBefore || showEllipsisAfter) {
+                        return (
+                          <span key={pageNum} style={{ padding: '0 4px', color: '#9ca3af' }}>
+                            ...
+                          </span>
+                        );
+                      }
+
+                      if (!showPage) return null;
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentServicePage(pageNum)}
+                          style={{
+                            minWidth: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            border: pageNum === currentServicePage ? 'none' : '1px solid #d1d5db',
+                            background: pageNum === currentServicePage ? '#0ea5e9' : 'white',
+                            color: pageNum === currentServicePage ? 'white' : '#374151',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: pageNum === currentServicePage ? '600' : '500',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="clinic-radio" style={{ marginLeft: '8px' }}>
-                    <input 
-                      type="radio" 
-                      name="doctor" 
-                        checked={selectedDoctorId === staff.id}
-                        onChange={() => {
-                          console.log('🔘 Radio button clicked for doctor:', staff);
-                          console.log('🔘 Setting selectedDoctorId to:', staff.id);
-                          setSelectedDoctorId(staff.id);
-                        }}
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                  </div>
+
+                  {/* Next Button */}
+                  <button
+                    onClick={() => setCurrentServicePage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentServicePage === totalPages}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      background: currentServicePage === totalPages ? '#f3f4f6' : 'white',
+                      color: currentServicePage === totalPages ? '#9ca3af' : '#374151',
+                      cursor: currentServicePage === totalPages ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    التالي
+                    <FaArrowLeft style={{ fontSize: '12px' }} />
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
-            ) : (
-              <div style={{ 
-                textAlign: 'center', 
-                padding: '2rem', 
-                color: '#6b7280',
-                backgroundColor: '#f9fafb',
-                borderRadius: '8px',
-                margin: '16px 0'
-              }}>
-                <FaStethoscope style={{ fontSize: '2rem', marginBottom: '1rem', color: '#d1d5db' }} />
-                <p style={{ margin: '0', fontSize: '16px' }}>
-                  لا يوجد أطباء متاحين في هذه العيادة حالياً
-                </p>
-                <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', color: '#9ca3af' }}>
-                  يرجى اختيار عيادة أخرى أو المحاولة لاحقاً
-                </p>
-              </div>
-            )}
           </>
         )}
 
@@ -1189,6 +1846,81 @@ const NewBookingFilter = ({
             <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
               يمكنك تخطي هذه الخطوة والمتابعة للحجز
             </p>
+            
+            {/* Current Location Option */}
+            {latitude && longitude && address && (
+              <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '16px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                border: selectedAddressId === 'current_location' ? '2px solid #0ea5e9' : '1px solid #e5e7eb'
+              }}>
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setSelectedAddressId('current_location')}
+                >
+                  <input
+                    type="radio"
+                    name="address"
+                    checked={selectedAddressId === 'current_location'}
+                    onChange={() => setSelectedAddressId('current_location')}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: '#f0f9ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#0ea5e9',
+                    fontSize: '16px'
+                  }}>
+                    <FaMapMarkerAlt />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ 
+                      margin: '0 0 4px 0', 
+                      fontSize: '16px', 
+                      fontWeight: '600', 
+                      color: '#1f2937' 
+                    }}>
+                      موقعي الحالي
+                    </h4>
+                    <p style={{ 
+                      margin: '0', 
+                      fontSize: '14px', 
+                      color: '#6b7280' 
+                    }}>
+                      {address}
+                    </p>
+                  </div>
+                  {selectedAddressId === 'current_location' && (
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: '#0ea5e9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: '12px'
+                    }}>
+                      <FaCheck />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             {/* Add Address Form */}
             {showAddAddressForm ? (
@@ -1416,6 +2148,82 @@ const NewBookingFilter = ({
         {currentBookingStep === 5 && (
           <>
             <h3 className="content-title">اختر التاريخ والوقت</h3>
+            <p style={{ 
+              textAlign: 'center', 
+              color: '#6b7280', 
+              fontSize: '14px', 
+              marginBottom: '16px',
+              background: '#f8fafc',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              اختيار الوقت اختياري - يمكنك الحجز بدون تحديد وقت محدد
+            </p>
+            
+            {/* Booking Summary */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '20px'
+            }}>
+              <h4 style={{ 
+                margin: '0 0 12px 0', 
+                fontSize: '16px', 
+                fontWeight: '600', 
+                color: '#1f2937',
+                textAlign: 'center'
+              }}>
+                ملخص الحجز
+              </h4>
+              <div style={{ display: 'grid', gap: '8px', fontSize: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280' }}>العيادة:</span>
+                  <span style={{ fontWeight: '600', color: '#1f2937' }}>{selectedClinic}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280' }}>الطبيب:</span>
+                  <span style={{ fontWeight: '600', color: '#1f2937' }}>
+                    {clinicStaff.find(s => s.id === selectedDoctorId)?.name || 
+                     clinicStaff.find(s => s.id === selectedDoctorId)?.name_ar || 
+                     'طبيب محدد'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280' }}>الخدمات:</span>
+                  <span style={{ fontWeight: '600', color: '#0ea5e9' }}>{selectedServiceIds.length} خدمة</span>
+                </div>
+                {selectedAddressId && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#6b7280' }}>العنوان:</span>
+                    <span style={{ fontWeight: '600', color: '#1f2937', fontSize: '12px', maxWidth: '200px', textAlign: 'right' }}>
+                      {/* selectedAddressId === 'current_location' 
+                        ? (address || 'موقعي الحالي')
+                        : */ (userAddresses.find(addr => addr.id === selectedAddressId)?.address || 
+                           userAddresses.find(addr => addr.id === selectedAddressId)?.title ||
+                           userAddresses.find(addr => addr.id === selectedAddressId)?.name ||
+                           'عنوان محدد')
+                      }
+                    </span>
+                  </div>
+                )}
+                <div style={{ 
+                  borderTop: '1px solid #e2e8f0', 
+                  paddingTop: '8px', 
+                  marginTop: '8px',
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center' 
+                }}>
+                  <span style={{ color: '#6b7280' }}>إجمالي الحجوزات:</span>
+                  <span style={{ fontWeight: '700', color: '#059669', fontSize: '16px' }}>
+                    {selectedServiceIds.length} حجز
+                  </span>
+                </div>
+              </div>
+            </div>
             <div className="booking-date-time-content">
               {/* Calendar Card */}
               <div className="booking-calendar-card">
@@ -1549,7 +2357,7 @@ const NewBookingFilter = ({
                     <div className="booking-no-appointments">
                       <FaClock className="booking-no-appointments-icon" />
                       <p className="booking-no-appointments-text">
-                        {selectedDate && selectedDoctorId && selectedServiceId 
+                        {selectedDate && selectedDoctorId && selectedServiceIds.length > 0 
                           ? (availableDays[selectedDate] === false 
                               ? `لا توجد مواعيد متاحة في ${selectedDate} أكتوبر` 
                               : 'جاري تحميل المواعيد...')
@@ -1578,23 +2386,31 @@ const NewBookingFilter = ({
           <button 
             className="next-btn"
             onClick={() => setCurrentBookingStep(currentBookingStep + 1)}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              if (
+                !(currentBookingStep === 1 && !selectedClinic) &&
+                !(currentBookingStep === 2 && selectedServiceIds.length === 0)
+              ) {
+                setCurrentBookingStep(currentBookingStep + 1);
+              }
+            }}
             disabled={
               (currentBookingStep === 1 && !selectedClinic) ||
-              (currentBookingStep === 2 && !selectedServiceId) ||
-              (currentBookingStep === 3 && clinicStaff.length > 0 && !selectedDoctorId)
+              (currentBookingStep === 2 && selectedServiceIds.length === 0)
+              // الدكتور اختياري - تم إزالة التحقق من الخطوة 3
               // Removed step 4 validation to allow skipping address selection
             }
             style={{
               opacity: (
                 (currentBookingStep === 1 && !selectedClinic) ||
-                (currentBookingStep === 2 && !selectedServiceId) ||
-                (currentBookingStep === 3 && clinicStaff.length > 0 && !selectedDoctorId)
+                (currentBookingStep === 2 && selectedServiceIds.length === 0)
               ) ? 0.5 : 1,
               cursor: (
                 (currentBookingStep === 1 && !selectedClinic) ||
-                (currentBookingStep === 2 && !selectedServiceId) ||
-                (currentBookingStep === 3 && clinicStaff.length > 0 && !selectedDoctorId)
-              ) ? 'not-allowed' : 'pointer'
+                (currentBookingStep === 2 && selectedServiceIds.length === 0)
+              ) ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation'
             }}
           >
             التالي <FaArrowLeft className="next-icon" />
@@ -1604,10 +2420,9 @@ const NewBookingFilter = ({
           <button 
             className="confirm-btn"
             onClick={completeBooking}
-            disabled={!selectedDate || !selectedTime}
             style={{ 
-              opacity: (selectedDate && selectedTime) ? 1 : 0.5,
-              cursor: (selectedDate && selectedTime) ? 'pointer' : 'not-allowed'
+              opacity: 1,
+              cursor: 'pointer'
             }}
           >
             تأكيد الحجز <FaCheck className="confirm-icon" />
@@ -1646,4 +2461,3 @@ if (typeof document !== 'undefined') {
   styleSheet.innerText = styles;
   document.head.appendChild(styleSheet);
 }
-

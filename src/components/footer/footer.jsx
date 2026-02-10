@@ -9,7 +9,25 @@ function Footer() {
   const [clinics, setClinics] = useState([]);
   const [contactData, setContactData] = useState(null);
   const [socialMedia, setSocialMedia] = useState(null);
+  const [websiteSettings, setWebsiteSettings] = useState(null);
+  const [websiteLogo, setWebsiteLogo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [logoLoading, setLogoLoading] = useState(true);
+
+  // دالة تحويل رابط الـ embed إلى رابط Google Maps عادي
+  const convertEmbedToMapsLink = (embedUrl, fallbackAddress) => {
+    if (!embedUrl) return '#';
+    
+    // لو لينك embed
+    if (embedUrl.includes('/maps/embed')) {
+      if (fallbackAddress) {
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackAddress)}`;
+      }
+      return 'https://www.google.com/maps';
+    }
+    
+    return embedUrl;
+  };
 
   // دالة للتوجيه إلى صفحة العيادة (نفس الطريقة المستخدمة في ServicesSection)
   const handleClinicClick = (clinicId) => {
@@ -44,9 +62,25 @@ function Footer() {
           if (socialInfo) {
             setSocialMedia(socialInfo.data);
           }
+
+          // البحث عن إعدادات الموقع
+          const websiteInfo = contactResult.data.find(item => item.prefix === 'website_settings');
+          if (websiteInfo) {
+            setWebsiteSettings(websiteInfo.data);
+          }
         }
+
+        // جلب لوجو الموقع
+        const logoResponse = await fetch('https://ghaimcenter.com/laravel/api/website-logo');
+        const logoResult = await logoResponse.json();
+        
+        if (logoResult.status === true && logoResult.logo) {
+          setWebsiteLogo(logoResult.logo);
+        }
+        setLogoLoading(false);
       } catch (error) {
         console.error('خطأ في جلب البيانات:', error);
+        setLogoLoading(false);
       } finally {
         setLoading(false);
       }
@@ -89,7 +123,13 @@ function Footer() {
 
           {/* وصف المجمع */}
           <div>
-            <img src="/logoo.png" alt="مجمع غيم الطبي" />
+            {logoLoading ? (
+              <div className="mb-4 flex items-center justify-start">
+                <div className="spinner-footer"></div>
+              </div>
+            ) : (
+              <img src={websiteLogo || "/logoo.png"} alt="مجمع غيم الطبي" />
+            )}
             <p
               className="text-sm opacity-90 leading-relaxed mb-6"
               style={{
@@ -104,17 +144,17 @@ function Footer() {
                 verticalAlign: 'middle'
               }}
             >
-              مجمع غيم الطبي متكامل يضم نخبة من المختصين والاستشاريين في مجالي قسم الأسنان والجلدية والليزر والعلاج الطبيعي بأحدث الأجهزة والتقنيات الحديثة
+              {websiteSettings?.description || 'مجمع غيم الطبي متكامل يضم نخبة من المختصين والاستشاريين في مجالي قسم الأسنان والجلدية والليزر والعلاج الطبيعي بأحدث الأجهزة والتقنيات الحديثة'}
             </p>
 
             {/* معلومات التواصل */}
             <div className="space-y-3">
               {contactData && contactData.address && contactData.google_maps_link && (
-                <div className="flex items-center gap-2 text-white mb-4" style={{ fontFamily: 'Almarai', fontWeight: 400 }}>
+                <div className="flex items-center gap-2 text-white mb-4" style={{ fontFamily: 'Almarai', fontWeight:300 }}>
                   <FaMapMarkerAlt className="text-green-400 text-lg flex-shrink-0" />
                   <span className="text-white" style={{
                     fontFamily: 'Almarai',
-                    fontWeight: 700,
+                    fontWeight: 600,
                     fontStyle: 'Bold',
                     fontSize: '12px',
                     leadingTrim: 'NONE',
@@ -124,7 +164,10 @@ function Footer() {
                     verticalAlign: 'middle'
                   }}>العنوان:</span>
                   <a 
-                    href={contactData.google_maps_link}
+                    href={convertEmbedToMapsLink(
+                      contactData.google_maps_link,
+                      contactData.address
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-white hover:text-green-400 transition-colors cursor-pointer"
@@ -132,7 +175,7 @@ function Footer() {
                       fontFamily: 'Almarai',
                       fontWeight: 400,
                       fontStyle: 'Regular',
-                      fontSize: '12px',
+                      fontSize: '10px',
                       leadingTrim: 'NONE',
                       lineHeight: '26px',
                       letterSpacing: '0%',
@@ -227,7 +270,7 @@ function Footer() {
                     fontFamily: 'Almarai',
                     fontWeight: 400,
                     fontStyle: 'Regular',
-                    fontSize: '12px',
+                    fontSize: '10px',
                     lineHeight: '26px',
                     letterSpacing: '0%',
                     textAlign: 'right',
@@ -262,6 +305,7 @@ function Footer() {
               <li><Link to="/privacy" className="hover:text-white transition-colors">سياسة الخصوصية</Link></li>
               <li><Link to="/return-policy" className="hover:text-white transition-colors">سياسة الإرجاع</Link></li>
               <li><Link to="/terms" className="hover:text-white transition-colors">شروط الخدمة</Link></li>
+              <li><Link to="/laser-guidelines" className="hover:text-white transition-colors">إرشادات الليزر</Link></li>
               <li><a href="/blog" className="hover:text-white transition-colors">المدونة</a></li>
               <li><a href="/contact" className="hover:text-white transition-colors">تواصل معنا</a></li>
               <li><a href="/support" className="hover:text-white transition-colors">الدعم</a></li>
@@ -529,7 +573,7 @@ function Footer() {
                 letterSpacing: '0%',
                 textAlign: 'right',
                 verticalAlign: 'middle'
-              }}>الرقم الضريبي: 310908705600003</span>
+              }}>الرقم الضريبي: {websiteSettings?.tax_number || ""}</span>
             </div>
           </div>
         </div>

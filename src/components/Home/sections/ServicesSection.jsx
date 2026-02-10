@@ -1,11 +1,96 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getClinicsData } from '../../../API/apiService';
 
 function ServicesSection() {
   const navigate = useNavigate();
+  const scrollContainerRef = useRef(null);
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Auto-scroll functionality for mobile
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || loading || clinics.length === 0) return;
+
+    // Check if it's mobile device
+    const isMobile = window.innerWidth <= 768;
+    if (!isMobile) return;
+
+    let scrollInterval;
+    let isScrolling = false;
+    let scrollDirection = 1; // 1 for right, -1 for left
+
+    const startAutoScroll = () => {
+      scrollInterval = setInterval(() => {
+        if (isScrolling) return;
+
+        const maxScrollLeft = container.scrollWidth - container.clientWidth;
+        const currentScroll = container.scrollLeft;
+
+        // Change direction when reaching ends
+        if (currentScroll >= maxScrollLeft) {
+          scrollDirection = -1;
+        } else if (currentScroll <= 0) {
+          scrollDirection = 1;
+        }
+
+        // Smooth scroll
+        container.scrollBy({
+          left: scrollDirection * 320, // width of one card + gap
+          behavior: 'smooth'
+        });
+      }, 4000); // Auto-scroll every 4 seconds
+    };
+
+    // Stop auto-scroll when user interacts
+    const stopAutoScroll = () => {
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+      }
+    };
+
+    // Resume auto-scroll after user stops interacting
+    const resumeAutoScroll = () => {
+      stopAutoScroll();
+      setTimeout(startAutoScroll, 2000); // Resume after 2 seconds
+    };
+
+    // Event listeners
+    container.addEventListener('touchstart', () => {
+      isScrolling = true;
+      stopAutoScroll();
+    });
+
+    container.addEventListener('touchend', () => {
+      isScrolling = false;
+      resumeAutoScroll();
+    });
+
+    container.addEventListener('scroll', () => {
+      isScrolling = true;
+      stopAutoScroll();
+      // Resume after scroll ends
+      setTimeout(() => {
+        isScrolling = false;
+        resumeAutoScroll();
+      }, 1000);
+    });
+
+    // Start auto-scroll
+    startAutoScroll();
+
+    // Cleanup
+    return () => {
+      stopAutoScroll();
+      if (container) {
+        container.removeEventListener('touchstart', stopAutoScroll);
+        container.removeEventListener('touchend', resumeAutoScroll);
+        container.removeEventListener('scroll', stopAutoScroll);
+      }
+    };
+  }, [loading, clinics]);
 
   // دالة للتوجيه إلى صفحة العروض
   const handleClinicClick = (clinicId) => {
@@ -98,24 +183,28 @@ function ServicesSection() {
         </div>
 
         {/* البطاقات */}
-        <div className="grid grid-cols-1 place-items-center md:grid-cols-2 md:place-items-start lg:grid-cols-4 gap-4 sm:gap-6">
+        <div 
+          ref={scrollContainerRef}
+          className="flex md:grid md:grid-cols-4 overflow-x-auto md:overflow-visible gap-4 sm:gap-6 md:gap-8 pb-3" 
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
           {loading ? (
             // Loading placeholders
             Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="bg-white rounded-xl overflow-hidden shadow-md mx-auto md:mx-0 animate-pulse"
-                style={{
-                  width: '337.16px',
-                  height: '482.20px',
-                  maxWidth: '100%'
-                }}
+                className="bg-white rounded-xl overflow-hidden shadow-md animate-pulse flex-shrink-0 w-[300px] sm:w-[340px] md:w-full h-[520px]"
               >
                 {/* Placeholder for image */}
-                <div className="w-full h-[calc(482.20px-80px)] bg-gray-200 rounded-t-xl"></div>
+                <div className="w-full h-[430px] bg-gray-200 rounded-t-xl"></div>
 
                 {/* Placeholder for title */}
-                <div className="p-4 sm:p-5 text-center h-20 flex items-center justify-center">
+                <div className="p-4 sm:p-5 text-center h-[90px] flex items-center justify-center">
                   <div className="h-6 bg-gray-200 rounded w-3/4"></div>
                 </div>
               </div>
@@ -125,15 +214,10 @@ function ServicesSection() {
               <div
                 key={clinic.id}
                 onClick={() => handleClinicClick(clinic.id)}
-                className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 mx-auto md:mx-0 cursor-pointer"
-                style={{
-                  width: '337.16px',
-                  height: '482.20px',
-                  maxWidth: '100%'
-                }}
+                className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex-shrink-0 w-[300px] sm:w-[340px] md:w-full h-[520px]"
               >
                 {/* الصورة */}
-                <div className="relative w-full h-[calc(482.20px-80px)] overflow-hidden bg-gray-100 rounded-t-xl">
+                <div className="relative w-full h-[430px] overflow-hidden bg-gray-100 rounded-t-xl">
                   <img
                     src={clinic.image}
                     alt={clinic.alt}
@@ -145,9 +229,9 @@ function ServicesSection() {
                 </div>
 
                 {/* العنوان */}
-                <div className="p-4 sm:p-5 text-center h-20 flex items-center justify-center">
+                <div className="p-5 sm:p-6 text-center h-[90px] flex items-center justify-center">
                   <h3
-                    className="text-lg sm:text-xl font-bold text-gray-900"
+                    className="text-xl sm:text-2xl font-bold text-gray-900"
                     style={{
                       fontFamily: 'Almarai',
                       fontWeight: 700

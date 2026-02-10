@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaRocket } from 'react-icons/fa';
 
@@ -89,47 +89,30 @@ function Navbar() {
       backgroundColor: '#005b99',
       fontFamily: 'Almarai',
       fontWeight: 700,
-      fontStyle: 'Bold',
-      fontSize: '16px',
-      leadingTrim: 'NONE',
-      lineHeight: '70px',
-      letterSpacing: '0%',
-      verticalAlign: 'middle'
+      fontSize: '16px'
     }} dir="rtl">
-      <div className="container mx-auto px-2 sm:px-4 flex flex-col sm:flex-row items-center gap-2 sm:gap-0 py-1 relative">
-        {/* Right Section - Language and Contact (moved to left) */}
-        <div className="flex flex-row-reverse sm:space-x-reverse sm:space-x-3 flex-wrap justify-center sm:justify-start items-center text-xs sm:text-sm gap-1.5 sm:gap-0" style={{ color: '#FFFFFF' }}>
-          {contactData?.phone && (
-            <>
-              <a 
-                href={`tel:${contactData.phone}`}
-                className="text-lime-400 font-medium hover:text-white transition-colors cursor-pointer"
-              >
-                {contactData.phone}
-              </a>
-              <span className="text-gray-400 hidden sm:inline">|</span>
-              <span>للاستفسار:</span>
-              <span className="text-gray-400 hidden sm:inline">|</span>
-            </>
-          )}
-          {loading && (
-            <>
-              <span className="text-lime-400 font-medium">جاري التحميل...</span>
-              <span className="text-gray-400 hidden sm:inline">|</span>
-              <span>للاستفسار:</span>
-              <span className="text-gray-400 hidden sm:inline">|</span>
-            </>
-          )}
+      <div className="container mx-auto px-4 lg:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 py-1 relative">
+        {/* Right Section - Language and Contact */}
+        <div className="flex flex-row-reverse sm:space-x-reverse sm:space-x-3 items-center text-sm gap-1" style={{ color: '#FFFFFF' }}>
+          <a 
+            href={contactData?.phone ? `tel:${contactData.phone}` : '#'}
+            className="text-lime-400 font-medium hover:text-white transition-colors cursor-pointer"
+          >
+            {contactData?.phone || (loading ? 'Loading...' : '')}
+          </a>
+          <span className="text-gray-400 hidden sm:inline">|</span>
+          <span>للاستفسار:</span>
+          <span className="text-gray-400 hidden sm:inline">|</span>
           <span>العربية</span>
         </div>
 
-        {/* Center Section - Promotional Message (centered absolutely) */}
-        <div className="font-medium text-xs sm:text-sm whitespace-nowrap text-center sm:absolute sm:left-1/2 sm:transform sm:-translate-x-1/2 sm:top-1/2 sm:-translate-y-1/2" style={{ color: '#9bc115' }}>
+        {/* Center Section - Promotional Message */}
+        <div className="font-medium text-sm text-center flex-1 whitespace-nowrap" style={{ color: '#9bc115' }}>
           عروض وخصومات تصل الى 50% لفترة محدودة
         </div>
 
-        {/* Left Section - Navigation Links (moved to right) */}
-        <div className="flex flex-row-reverse sm:space-x-reverse flex-wrap justify-center sm:justify-end items-center text-xs sm:text-sm gap-1.5 sm:gap-0 sm:ml-auto" style={{ color: '#FFFFFF', transform: 'translateX(-50rem)' }}>
+        {/* Left Section - Navigation Links */}
+        <div className="flex flex-row-reverse sm:space-x-reverse items-center text-sm gap-1" style={{ color: '#FFFFFF' }}>
           {isLoggedIn ? (
             <Link to="/dashboard" className="hover:opacity-80 cursor-pointer transition-opacity sm:px-2">حسابي</Link>
           ) : (
@@ -191,7 +174,7 @@ function Navbar() {
                   className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 text-sm"
                   style={{ fontFamily: 'Almarai' }}
                 >
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                     </svg>

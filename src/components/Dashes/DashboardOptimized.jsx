@@ -23,8 +23,8 @@ import NewBookingFilter from './Filters/NewBookingFilter';
 const DashboardOptimized = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, logout } = useAuth();
-  const [activeFilter, setActiveFilter] = useState('الرئيسية');
+  const { isAuthenticated, logout, updateUser } = useAuth();
+  const [activeFilter, setActiveFilter] = useState('لوحة التحكم الرئيسية');
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
     fullName: '',
@@ -37,7 +37,7 @@ const DashboardOptimized = () => {
   const [userData, setUserData] = useState(null);
   const [selectedClinic, setSelectedClinic] = useState(1);
   const [currentBookingStep, setCurrentBookingStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState(11);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   // Initialize calendar with current month and year
   const today = new Date();
@@ -194,7 +194,7 @@ const DashboardOptimized = () => {
 
   // Filter menu items with memoization for performance
   const filterItems = useMemo(() => [
-    { id: 'الرئيسية', icon: FaHome, path: '/dashboard', color: '#3B82F6' },
+    { id: 'لوحة التحكم الرئيسية', icon: FaHome, path: '/dashboard', color: '#3B82F6' },
     { id: 'البروفايل', icon: FaUser, path: '/dashboard/profile', color: '#10B981' },
     { id: 'حجوزاتي', icon: FaCalendarAlt, path: '/dashboard/bookings', color: '#F59E0B' },
     { id: 'الخدمات', icon: FaSearch, path: '/dashboard/services', color: '#8B5CF6' },
@@ -261,10 +261,12 @@ const DashboardOptimized = () => {
           console.log('✅ Profile updated:', result);
           alert('تم تحديث البروفايل بنجاح!');
           
-          // Update local storage
+          // Update local storage and AuthContext with correct key name
           const updatedUser = result.data;
+          localStorage.setItem('userData', JSON.stringify(updatedUser));
           localStorage.setItem('user', JSON.stringify(updatedUser));
           setUserData(updatedUser);
+          updateUser(updatedUser);
           
           // After profile updated, also send address to addresses endpoint
           try {
@@ -326,16 +328,51 @@ const DashboardOptimized = () => {
     }));
   }, []);
 
-  const handleImageChange = useCallback((e) => {
+  const handleImageChange = useCallback(async (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         setUploadedImage(reader.result);
+        
+        // Auto-save image immediately
+        try {
+          const token = localStorage.getItem('authToken');
+          const formData = new FormData();
+          
+          // Convert base64 to blob
+          const response = await fetch(reader.result);
+          const blob = await response.blob();
+          formData.append('profile_image', blob, 'profile.jpg');
+          
+          const updateResponse = await fetch('https://ghaimcenter.com/laravel/api/user/update', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: formData
+          });
+          
+          if (updateResponse.ok) {
+            const result = await updateResponse.json();
+            console.log('✅ Profile image updated:', result);
+            
+            // Update local storage and AuthContext
+            const updatedUser = result.data;
+            localStorage.setItem('userData', JSON.stringify(updatedUser));
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            setUserData(updatedUser);
+            updateUser(updatedUser);
+          } else {
+            console.error('❌ Image update failed');
+          }
+        } catch (error) {
+          console.error('💥 Error saving image:', error);
+        }
       };
       reader.readAsDataURL(file);
     }
-  }, []);
+  }, [updateUser]);
 
 
   return (
@@ -382,7 +419,7 @@ const DashboardOptimized = () => {
       </div>
 
       {/* Dynamic Content Based on Active Filter */}
-      {activeFilter === 'الرئيسية' && <HomeFilter />}
+      {activeFilter === 'لوحة التحكم الرئيسية' && <HomeFilter />}
 
       {activeFilter === 'البروفايل' && (
         <ProfileFilter 

@@ -88,6 +88,7 @@ function Booking() {
         fetchStaffForClinic(state.clinicId).then(doctors => {
           setFilteredDoctors(doctors);
           setLoadingStaff(false);
+          setShowDoctors(true); // Show doctors after loading
           // Show doctors if we have all required data
           if (state.doctorId && state.date) {
             setShowDoctors(true);
@@ -143,11 +144,29 @@ function Booking() {
   const fetchStaffForClinic = async (clinicId) => {
     try {
       setLoadingStaff(true);
+      
+      // Get clinic info first
+      const clinicResponse = await fetch(`https://ghaimcenter.com/laravel/api/clinics`);
+      const clinicResult = await clinicResponse.json();
+      const clinic = clinicResult.data?.data?.find(c => c.id == clinicId);
+      
+      // Get staff for the clinic
       const response = await fetch(`https://ghaimcenter.com/laravel/api/clinics/${clinicId}/staff`);
       const result = await response.json();
 
       if (result.status === 'success') {
-        setFilteredDoctors(result.data?.staff || []);
+        const staff = result.data?.staff || [];
+        // Add clinic info to each doctor
+        const doctorsWithClinicInfo = staff.map(doctor => ({
+          ...doctor,
+          clinic_name: clinic?.clinic_name || clinic?.owner_name,
+          clinic_id: clinicId,
+          clinic_address: clinic?.clinic_address,
+          clinic_phone: clinic?.clinic_phone
+        }));
+        
+        setFilteredDoctors(doctorsWithClinicInfo);
+        setShowDoctors(true); // Show doctors after loading
       }
     } catch (error) {
       console.error('Error fetching staff:', error);
@@ -182,7 +201,9 @@ function Booking() {
               return staff.map(doctor => ({
                 ...doctor,
                 clinic_name: clinic.clinic_name || clinic.owner_name,
-                clinic_id: clinic.id
+                clinic_id: clinic.id,
+                clinic_address: clinic.clinic_address,
+                clinic_phone: clinic.clinic_phone
               }));
             }
             return [];
@@ -413,7 +434,7 @@ function Booking() {
                     ${displayedDoctors.length === 1 ? 'grid-cols-1 justify-items-center' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}
                     gap-8
                     items-stretch
-                  `}>
+                  `} dir="rtl">
                     {displayedDoctors.map((doctor) => (
                         <div
                           key={doctor.id}
@@ -463,13 +484,21 @@ function Booking() {
                         {/* Clinic Information */}
                         <div className="text-sm text-gray-600 space-y-1 mb-3">
                           <div className="flex items-center justify-center gap-1">
-                            <span className="font-medium">العنوان:</span>
-                            <span>{clinics.find(c => c.id == formData.clinic)?.clinic_address || 'غير محدد'}</span>
+                            <span className="font-medium">العيادة:</span>
+                            <span>{doctor.clinic_name || 'غير محدد'}</span>
                           </div>
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="font-medium">الهاتف:</span>
-                            <span>{clinics.find(c => c.id == formData.clinic)?.clinic_phone || 'غير محدد'}</span>
-                          </div>
+                          {doctor.clinic_address && (
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="font-medium">العنوان:</span>
+                              <span>{doctor.clinic_address}</span>
+                            </div>
+                          )}
+                          {doctor.clinic_phone && (
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="font-medium">الهاتف:</span>
+                              <span>{doctor.clinic_phone}</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Doctor Info Separator */}

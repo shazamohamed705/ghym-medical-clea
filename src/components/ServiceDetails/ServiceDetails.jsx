@@ -1,16 +1,30 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './ServiceDetails.css';
 import { getClinicsServices } from '../../API/apiService';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import Footer from '../footer/footer';
+import useGeolocation from '../../hooks/useGeolocation';
+import { FaMapMarkerAlt, FaCheck } from 'react-icons/fa';
 
 const ServiceDetails = () => {
   const { clinicId, serviceId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { latitude, longitude, address: currentLocationAddress } = useGeolocation();
   const [serviceData, setServiceData] = useState(null);
-  const [salonData, setSalonData] = useState(null);
+  const [clinicData, setClinicData] = useState(null);
+  // Get clinicId from URL params or from service data
+  const getClinicId = () => {
+    if (clinicId) return clinicId;
+    if (location.state && location.state.service && location.state.service.clinic_id) {
+      return location.state.service.clinic_id;
+    }
+    return null;
+  };
+
+  const actualClinicId = getClinicId();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -64,6 +78,10 @@ const ServiceDetails = () => {
   const minDate = useMemo(() => normalizeDateYMD(new Date()), []);
 
   const [addresses, setAddresses] = useState([]);
+  const [showAddAddressForm, setShowAddAddressForm] = useState(false);
+  const [newAddress, setNewAddress] = useState('');
+  const [newCity, setNewCity] = useState('');
+  const [isAddingAddress, setIsAddingAddress] = useState(false);
   const [bookingData, setBookingData] = useState({
     staff_id: null,
     date: '',
@@ -103,6 +121,11 @@ const ServiceDetails = () => {
       .animate-slide-up {
         animation: slide-up 0.4s ease-out;
       }
+      .address-input-group {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
@@ -132,6 +155,23 @@ const ServiceDetails = () => {
       setIsLoading(true);
       setError(null);
 
+      // Check if service data is passed from search results
+      if (location.state && location.state.service) {
+        const service = location.state.service;
+        console.log('✅ Service data received from search:', service);
+        setServiceData(service);
+        
+        // If clinic data is available in the service object
+        if (service.clinic) {
+          setClinicData(service.clinic);
+          console.log('✅ Clinic data from service:', service.clinic);
+        }
+        
+        setIsLoading(false);
+        return;
+      }
+
+      // Fallback to API fetch if no state data
       try {
         console.log(`Fetching service details for clinic ${clinicId}, service ${serviceId}`);
         const result = await getClinicsServices();
@@ -143,7 +183,7 @@ const ServiceDetails = () => {
 
           if (service) {
             setServiceData(service);
-            setSalonData(service.clinic); // Set clinic data from service.clinic
+            setClinicData(service.clinic); // Set clinic data from service.clinic
             console.log('✅ Service found:', service);
             console.log('✅ Clinic data:', service.clinic);
           } else {
@@ -161,33 +201,168 @@ const ServiceDetails = () => {
       }
     };
 
-    if (serviceId) {
+    if (serviceId || (location.state && location.state.service)) {
       fetchServiceDetails();
     }
-  }, [clinicId, serviceId]);
+  }, [clinicId, serviceId, location.state]);
 
   // Fetch staff data
   const fetchStaffData = async () => {
     try {
-      console.log(`Fetching staff for clinic ID: ${clinicId}`);
-      const response = await fetch(`https://ghaimcenter.com/laravel/api/clinics/${clinicId}/staff`);
-      const result = await response.json();
-      console.log('Staff API response:', result);
+      const currentClinicId = actualClinicId;
+      const currentServiceId = serviceId || (location.state && location.state.service && location.state.service.id);
       
-      if (result.status === 'success' && result.data) {
-        // البيانات الآن تأتي في result.data.staff كـ array
-        const staffArray = Array.isArray(result.data.staff) ? result.data.staff : [];
-        // فلترة الأطباء النشطين فقط (status = 1) والذين يسمحون بالحجز الإلكتروني
-        const activeStaff = staffArray.filter(staff => 
-          staff.status === 1 && 
-          staff.allow_online_booking === true &&
-          staff.is_deleted === 0
+      console.log('👨‍⚕️ Fetching staff data for:', { currentClinicId, currentServiceId });
+      
+      // Check if we have service data with staffs field
+      if (!serviceData || serviceData.staffs === undefined) {
+        // Fallback: fetch service data from API
+        const serviceResponse = await fetch(`https://ghaimcenter.com/laravel/api/clinics/${currentClinicId}`);
+        const serviceResult = await serviceResponse.json();
+        
+        console.log('👨‍⚕️ Service response:', serviceResult);
+        
+        if (serviceResult.status === 'success' && serviceResult.data && serviceResult.data.services) {
+          const currentService = serviceResult.data.services.find(s => s.id === parseInt(currentServiceId));
+          
+          console.log('👨‍⚕️ Current service:', currentService);
+          console.log('👨‍⚕️ Service staffs field:', currentService?.staffs);
+          
+          if (!currentService) {
+            console.log('❌ Service not found');
+            setStaffData([]);
+            return;
+          }
+          
+          // Update serviceData with the fetched data
+          setServiceData(currentService);
+          
+          // Now process with the fetched service data
+          if (!currentService.staffs || currentService.staffs === null || currentService.staffs === '') {
+            console.log('❌ No staffs field in service');
+            setStaffData([]);
+            return;
+          }
+          
+          // Parse allowed staff IDs
+          let allowedStaffIds = [];
+          if (typeof currentService.staffs === 'string') {
+            // Support both comma and dash separators
+            const separator = currentService.staffs.includes(',') ? ',' : '-';
+            allowedStaffIds = currentService.staffs.split(separator).map(id => parseInt(id.trim()));
+          } else if (typeof currentService.staffs === 'number') {
+            allowedStaffIds = [currentService.staffs];
+          } else if (Array.isArray(currentService.staffs)) {
+            allowedStaffIds = currentService.staffs.map(staff => 
+              typeof staff === 'object' ? staff.id : parseInt(staff)
+            );
+          }
+          
+          console.log('👨‍⚕️ Allowed staff IDs:', allowedStaffIds);
+          
+          // Fetch all staff and filter
+          const staffResponse = await fetch(`https://ghaimcenter.com/laravel/api/clinics/${currentClinicId}/staff`);
+          const staffResult = await staffResponse.json();
+          
+          console.log('👨‍⚕️ All staff response:', staffResult);
+          
+          if (staffResult.status === 'success' && staffResult.data) {
+            const staffArray = Array.isArray(staffResult.data.staff) ? staffResult.data.staff : [];
+            
+            console.log('👨‍⚕️ All staff array:', staffArray);
+            console.log('👨‍⚕️ Staff count:', staffArray.length);
+            
+            // Filter by allowed staff IDs only (removed strict conditions)
+            const filteredStaff = staffArray.filter(staff => {
+              const isAllowed = allowedStaffIds.includes(staff.id);
+              const isNotDeleted = staff.is_deleted === 0 || staff.is_deleted === false || !staff.is_deleted;
+              
+              console.log(`👨‍⚕️ Staff ${staff.id} (${staff.name}):`, {
+                isAllowed,
+                isNotDeleted,
+                status: staff.status,
+                allow_online_booking: staff.allow_online_booking,
+                is_deleted: staff.is_deleted
+              });
+              
+              return isAllowed && isNotDeleted;
+            });
+            
+            console.log('✅ Filtered staff:', filteredStaff);
+            console.log('✅ Filtered staff count:', filteredStaff.length);
+            
+            setStaffData(filteredStaff);
+          } else {
+            console.log('❌ Staff response not successful');
+            setStaffData([]);
+          }
+        } else {
+          console.log('❌ Service response not successful');
+          setStaffData([]);
+        }
+        return;
+      }
+      
+      console.log('👨‍⚕️ Using existing serviceData');
+      console.log('👨‍⚕️ Service staffs field:', serviceData.staffs);
+      
+      // We have serviceData with staffs field
+      if (!serviceData.staffs || serviceData.staffs === null || serviceData.staffs === '') {
+        console.log('❌ No staffs field in existing serviceData');
+        setStaffData([]);
+        return;
+      }
+      
+      // Parse allowed staff IDs
+      let allowedStaffIds = [];
+      if (typeof serviceData.staffs === 'string') {
+        // Support both comma and dash separators
+        const separator = serviceData.staffs.includes(',') ? ',' : '-';
+        allowedStaffIds = serviceData.staffs.split(separator).map(id => parseInt(id.trim()));
+      } else if (typeof serviceData.staffs === 'number') {
+        allowedStaffIds = [serviceData.staffs];
+      } else if (Array.isArray(serviceData.staffs)) {
+        allowedStaffIds = serviceData.staffs.map(staff => 
+          typeof staff === 'object' ? staff.id : parseInt(staff)
         );
-        setStaffData(activeStaff);
-        console.log(`✅ Active staff found for clinic ${clinicId}:`, activeStaff);
-        console.log(`✅ Total staff count: ${staffArray.length}, Active staff count: ${activeStaff.length}`);
+      }
+      
+      console.log('👨‍⚕️ Allowed staff IDs from existing data:', allowedStaffIds);
+      
+      // Fetch all staff and filter
+      const staffResponse = await fetch(`https://ghaimcenter.com/laravel/api/clinics/${currentClinicId}/staff`);
+      const staffResult = await staffResponse.json();
+      
+      console.log('👨‍⚕️ All staff response:', staffResult);
+      
+      if (staffResult.status === 'success' && staffResult.data) {
+        const staffArray = Array.isArray(staffResult.data.staff) ? staffResult.data.staff : [];
+        
+        console.log('👨‍⚕️ All staff array:', staffArray);
+        console.log('👨‍⚕️ Staff count:', staffArray.length);
+        
+        // Filter by allowed staff IDs only (removed strict conditions)
+        const filteredStaff = staffArray.filter(staff => {
+          const isAllowed = allowedStaffIds.includes(staff.id);
+          const isNotDeleted = staff.is_deleted === 0 || staff.is_deleted === false || !staff.is_deleted;
+          
+          console.log(`👨‍⚕️ Staff ${staff.id} (${staff.name}):`, {
+            isAllowed,
+            isNotDeleted,
+            status: staff.status,
+            allow_online_booking: staff.allow_online_booking,
+            is_deleted: staff.is_deleted
+          });
+          
+          return isAllowed && isNotDeleted;
+        });
+        
+        console.log('✅ Filtered staff:', filteredStaff);
+        console.log('✅ Filtered staff count:', filteredStaff.length);
+        
+        setStaffData(filteredStaff);
       } else {
-        console.log(`❌ No staff found for clinic ${clinicId}`);
+        console.log('❌ Staff response not successful');
         setStaffData([]);
       }
     } catch (error) {
@@ -199,9 +374,11 @@ const ServiceDetails = () => {
   // Fetch available times
   const fetchAvailableTimes = async (staffId, date) => {
     try {
+      const currentClinicId = actualClinicId;
+      const currentServiceId = serviceId || (location.state && location.state.service && location.state.service.id);
       const safeDate = normalizeDateYMD(date);
-      const url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${clinicId}?staff_id=${staffId}&date=${safeDate}&service_id=${serviceId}`;
-      console.log('⏰ Fetching available times...', { staffId, date, safeDate, serviceId, url });
+      const url = `https://ghaimcenter.com/laravel/api/clinics/available_times/${currentClinicId}?staff_id=${staffId}&date=${safeDate}&service_id=${currentServiceId}`;
+      console.log('⏰ Fetching available times...', { staffId, date, safeDate, serviceId: currentServiceId, url });
       const response = await fetch(url);
       console.log('⏰ Available times response status:', response.status);
       const rawText = await response.clone().text().catch(() => '');
@@ -214,7 +391,7 @@ const ServiceDetails = () => {
       console.log('⏰ Available times JSON:', result);
       if (!response.ok) {
         if (response.status === 422) {
-          console.warn('⏰ 422 Unprocessable Entity for available_times', { staffId, safeDate, serviceId, url, rawText, result });
+          console.warn('⏰ 422 Unprocessable Entity for available_times', { staffId, safeDate, serviceId: currentServiceId, url, rawText, result });
           setAvailableTimesError(result?.message || 'لا توجد أوقات متاحة لهذا اليوم');
         }
         setAvailableTimes({});
@@ -277,12 +454,20 @@ const ServiceDetails = () => {
         
         if (result.status === 'success' && result.data) {
           const contactData = result.data.find(item => item.prefix === 'contact_data');
-          if (contactData && contactData.data.whats_app_number) {
-            const whatsappNumber = contactData.data.whats_app_number;
+          if (contactData && contactData.data && contactData.data.whats_app_number) {
+            let whatsappNumber = contactData.data.whats_app_number;
+            // Remove any non-digit characters and ensure it's in the correct format
+            whatsappNumber = whatsappNumber.replace(/\D/g, '');
+            // If number doesn't start with country code, add it
+            if (!whatsappNumber.startsWith('966')) {
+              whatsappNumber = '966' + whatsappNumber.replace(/^0/, '');
+            }
+            
             const serviceName = serviceData.title_ar || serviceData.title;
             const message = `مرحباً، أريد حجز موعد لخدمة: ${serviceName}`;
             const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
             
+            console.log('📱 WhatsApp URL:', whatsappUrl);
             // Use window.location.href for better mobile compatibility
             window.location.href = whatsappUrl;
             return;
@@ -315,7 +500,7 @@ const ServiceDetails = () => {
   };
 
   const handleNextStep = () => {
-    if (bookingStep === 1 && selectedStaff) {
+    if (bookingStep === 1) {
       setBookingStep(2);
     }
   };
@@ -339,6 +524,98 @@ const ServiceDetails = () => {
     navigate('/login');
   };
 
+  // Add new address function
+  const handleAddNewAddress = async () => {
+    if (!newAddress.trim()) {
+      alert('يرجى إدخال العنوان');
+      return;
+    }
+
+    if (!newCity.trim()) {
+      alert('يرجى إدخال المدينة');
+      return;
+    }
+
+    try {
+      setIsAddingAddress(true);
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        alert('يرجى تسجيل الدخول أولاً');
+        return;
+      }
+
+      // Prepare address payload with dummy data for name and mobile
+      const addressPayload = {
+        name: 'مستخدم',
+        mobile: '0500000000',
+        address: newAddress.trim(),
+        city: newCity.trim()
+      };
+
+      console.log('📤 Sending address payload:', addressPayload);
+
+      const response = await fetch('https://ghaimcenter.com/laravel/api/user/addresses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(addressPayload)
+      });
+
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'success') {
+        // Refresh addresses list
+        const addressesResponse = await fetch('https://ghaimcenter.com/laravel/api/user/addresses', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (addressesResponse.ok) {
+          const addressesResult = await addressesResponse.json();
+          if (addressesResult.status === 'success' && addressesResult.data) {
+            const normalized = addressesResult.data.map((addr, idx) => {
+              const label = addr.full_address || addr.address || [addr.city, addr.district, addr.street].filter(Boolean).join(' - ');
+              return { id: addr.id ?? idx, label };
+            });
+            setAddresses(normalized);
+            
+            // Select the newly added address if it's the first one
+            if (addressesResult.data.length > 0) {
+              // Find the newly added address (last one or match by address text)
+              const newAddr = addressesResult.data.find(addr => 
+                addr.address === newAddress.trim() || 
+                addr.title === newAddress.trim() ||
+                addr.name === newAddress.trim()
+              ) || addressesResult.data[addressesResult.data.length - 1];
+              if (newAddr) {
+                setBookingData(prev => ({ ...prev, address: newAddr.id }));
+              }
+            }
+          }
+        }
+        
+        // Reset form and close
+        setNewAddress('');
+        setNewCity('');
+        setShowAddAddressForm(false);
+        
+        alert('تم إضافة العنوان بنجاح');
+      } else {
+        alert(result.message || 'فشل في إضافة العنوان');
+      }
+    } catch (error) {
+      console.error('Error adding address:', error);
+      alert('حدث خطأ أثناء إضافة العنوان');
+    } finally {
+      setIsAddingAddress(false);
+    }
+  };
+
   const handleConfirmBooking = async () => {
     try {
       setBookingError('');
@@ -351,17 +628,50 @@ const ServiceDetails = () => {
         return;
       }
 
+      const currentClinicId = actualClinicId;
+      const currentServiceId = serviceId || (location.state && location.state.service && location.state.service.id);
+
+      console.log('🔍 Booking data before validation:', {
+        staff_id: bookingData.staff_id,
+        selectedStaff: selectedStaff?.id,
+        date: bookingData.date,
+        timeCode: bookingData.timeCode,
+        address: bookingData.address,
+        notes: bookingData.notes
+      });
+
       const payload = {
-        clinics_id: Number(clinicId),
-        service_id: Number(serviceId),
-        staff_id: Number(bookingData.staff_id || selectedStaff?.id),
-        date: normalizeDateYMD(bookingData.date),
-        time: bookingData.timeCode
+        clinics_id: Number(currentClinicId),
+        service_id: Number(currentServiceId)
       };
+
+      // إضافة staff_id فقط إذا تم اختيار دكتور
+      const staffId = bookingData.staff_id || selectedStaff?.id;
+      if (staffId) {
+        payload.staff_id = Number(staffId);
+      }
+
+      // إضافة التاريخ فقط إذا تم اختياره
+      if (bookingData.date && bookingData.date !== '') {
+        payload.date = normalizeDateYMD(bookingData.date);
+      }
+
+      // إضافة الوقت فقط إذا تم اختياره
+      if (bookingData.timeCode && bookingData.timeCode !== '') {
+        payload.time = bookingData.timeCode;
+      }
 
       // إضافة العنوان فقط إذا تم اختياره
       if (bookingData.address && bookingData.address !== '') {
-        payload.address_id = Number(bookingData.address);
+        if (bookingData.address === 'current_location' && latitude && longitude) {
+          // استخدام الموقع الحالي
+          payload.address = currentLocationAddress || `${latitude}, ${longitude}`;
+          payload.latitude = latitude;
+          payload.longitude = longitude;
+        } else {
+          // استخدام عنوان محفوظ
+          payload.address_id = Number(bookingData.address);
+        }
       }
 
       // إضافة الملاحظات فقط إذا كانت موجودة
@@ -369,9 +679,16 @@ const ServiceDetails = () => {
         payload.notes = bookingData.notes.trim();
       }
 
-      // Basic validation
-      if (!payload.clinics_id || !payload.service_id || !payload.staff_id || !payload.date || !payload.time) {
-        setBookingError('يرجى اختيار الطبيب، التاريخ، والوقت');
+      console.log('🔍 Payload after processing:', payload);
+      console.log('🔍 Validation check:', {
+        clinics_id: !!payload.clinics_id,
+        service_id: !!payload.service_id,
+        staff_id: !!payload.staff_id
+      });
+
+      // Basic validation - الدكتور والتاريخ والوقت اختياري
+      if (!payload.clinics_id || !payload.service_id) {
+        setBookingError('حدث خطأ في بيانات الحجز');
         setIsSubmittingBooking(false);
         return;
       }
@@ -449,10 +766,29 @@ const ServiceDetails = () => {
   }
 
   // Use owner_photo as the main service image (fallback to service images)
-  const serviceImage = salonData?.owner_photo || 
-    (serviceData.images && serviceData.images.length > 0 
-      ? serviceData.images[0].image 
-      : '/imge.png');
+  // Get the latest service image based on created_at or updated_at
+  const getLatestServiceImage = () => {
+    if (!serviceData.images || serviceData.images.length === 0) {
+      return '/imge.png';
+    }
+    
+    // Sort images by created_at (newest first) or use the first one if no date
+    const sortedImages = [...serviceData.images].sort((a, b) => {
+      const dateA = new Date(a.created_at || a.updated_at || 0);
+      const dateB = new Date(b.created_at || b.updated_at || 0);
+      return dateB - dateA; // Newest first
+    });
+    
+    return sortedImages[0].image;
+  };
+
+  const serviceImage = getLatestServiceImage() || clinicData?.owner_photo;
+  
+  // Debug logging to check image sources
+  console.log('🖼️ Image Debug Info:');
+  console.log('- serviceData.images:', serviceData?.images);
+  console.log('- clinicData.owner_photo:', clinicData?.owner_photo);
+  console.log('- Final serviceImage:', serviceImage);
 
   const hasPrice = serviceData.price && Number(serviceData.price) > 0;
 
@@ -530,18 +866,23 @@ const ServiceDetails = () => {
                 src={serviceImage} 
                 alt={serviceData.title_ar || serviceData.title}
                 className="service-main-image"
+                onLoad={() => {
+                  console.log('✅ Image loaded successfully:', serviceImage);
+                }}
                 onError={(e) => {
+                  console.error('❌ Image failed to load:', serviceImage);
+                  console.error('❌ Error details:', e);
                   e.target.onerror = null;
                   e.target.src = '/imge.png';
                 }}
               />
-              {/* Salon Name Overlay */}
-              <div className="salon-name-overlay">
-                <div className="salon-name-content">
-                  <h2 className="overlay-salon-name">
-                    {salonData?.salon_name || 'اسم العيادة'}
+              {/* Clinic Name Overlay */}
+              <div className="clinic-name-overlay">
+                <div className="clinic-name-content">
+                  <h2 className="overlay-clinic-name">
+                    {clinicData?.clinic_name || clinicData?.salon_name || 'اسم العيادة'}
                   </h2>
-                  <div className="overlay-salon-icon">
+                  <div className="overlay-clinic-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
                       <line x1="12" y1="18" x2="12.01" y2="18"/>
@@ -553,20 +894,20 @@ const ServiceDetails = () => {
           </div>
         </div>
 
-        {/* Salon Information or Booking Form */}
-        {!showBookingForm && salonData && (
-          <div className="salon-info-section">
-            <h3 className="salon-info-title">معلومات العيادة</h3>
-            <div className="salon-info-content">
-              {/* Salon Basic Info without large photo */}
-              <div className="salon-header">
-                <div className="salon-basic-info">
-                  <h4 className="salon-name">{salonData.salon_name}</h4>
-                  <p className="salon-owner">{salonData.owner_name}</p>
+        {/* Clinic Information or Booking Form */}
+        {!showBookingForm && clinicData && (
+          <div className="clinic-info-section">
+            <h3 className="clinic-info-title">معلومات العيادة</h3>
+            <div className="clinic-info-content">
+              {/* Clinic Basic Info without large photo */}
+              <div className="clinic-header">
+                <div className="clinic-basic-info">
+                  <h4 className="clinic-name">{clinicData.clinic_name || clinicData.salon_name}</h4>
+                  <p className="clinic-owner">{clinicData.owner_name}</p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                    <div className="salon-rating">
+                    <div className="clinic-rating">
                     </div>
-                    <div className="salon-price-inline">
+                    <div className="clinic-price-inline">
                       {serviceData.price && Number(serviceData.price) > 0 ? (
                         <>
                           <span>{serviceData.price}</span>
@@ -580,25 +921,42 @@ const ServiceDetails = () => {
                 </div>
               </div>
               
-              {/* Salon Details */}
-              <div className="salon-details">
-                <div className="salon-info-item">
-                  <strong>العنوان:</strong> {salonData.salon_address}
+              {/* Clinic Details */}
+              <div className="clinic-details">
+                <div className="clinic-info-item">
+                  <strong>العنوان:</strong> {clinicData.clinic_address || clinicData.salon_address}
                 </div>
-                <div className="salon-info-item">
-                  <strong>الهاتف:</strong> {salonData.salon_phone}
+                <div className="clinic-info-item">
+                  <strong>الهاتف:</strong> {clinicData.clinic_phone || clinicData.salon_phone}
                 </div>
-                <div className="salon-info-item">
+                <div className="clinic-info-item">
                   <strong>ساعات العمل:</strong>
-                  <div className="salon-hours">
-                    <span>الأحد - الخميس: {salonData.mon_fri_from?.slice(0,2)}:{salonData.mon_fri_from?.slice(2,4)} - {salonData.mon_fri_to?.slice(0,2)}:{salonData.mon_fri_to?.slice(2,4)}</span>
-                    <span>الجمعة - السبت: {salonData.sat_sun_from?.slice(0,2)}:{salonData.sat_sun_from?.slice(2,4)} - {salonData.sat_sun_to?.slice(0,2)}:{salonData.sat_sun_to?.slice(2,4)}</span>
+                  <div className="clinic-hours" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                    {clinicData.work_times && clinicData.work_times.length > 0 ? (
+                      clinicData.work_times.map((workTime, index) => (
+                        <span key={index} style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>
+                          {workTime.day_name === 'monday' && 'الاثنين'}
+                          {workTime.day_name === 'tuesday' && 'الثلاثاء'}
+                          {workTime.day_name === 'wednesday' && 'الأربعاء'}
+                          {workTime.day_name === 'thursday' && 'الخميس'}
+                          {workTime.day_name === 'friday' && 'الجمعة'}
+                          {workTime.day_name === 'saturday' && 'السبت'}
+                          {workTime.day_name === 'sunday' && 'الأحد'}
+                          : {workTime.from} - {workTime.to}
+                        </span>
+                      ))
+                    ) : (
+                      <>
+                        <span style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>السبت - الخميس: {clinicData.mon_fri_from?.slice(0,2)}:{clinicData.mon_fri_from?.slice(2,4)} - {clinicData.mon_fri_to?.slice(0,2)}:{clinicData.mon_fri_to?.slice(2,4)}</span>
+                        <span style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>الجمعة: {clinicData.sat_sun_from?.slice(0,2)}:{clinicData.sat_sun_from?.slice(2,4)} - {clinicData.sat_sun_to?.slice(0,2)}:{clinicData.sat_sun_to?.slice(2,4)}</span>
+                      </>
+                    )}
                   </div>
                 </div>
-                {salonData.salon_about && (
-                  <div className="salon-info-item">
+                {clinicData.clinic_about && (
+                  <div className="clinic-info-item">
                     <strong>عن العيادة:</strong>
-                    <p className="salon-about">{salonData.salon_about}</p>
+                    <p className="clinic-about">{clinicData.clinic_about}</p>
                   </div>
                 )}
               </div>
@@ -626,7 +984,10 @@ const ServiceDetails = () => {
             {bookingStep === 1 && (
               <div className="booking-step-content" dir="rtl">
                 <div className="step-header">
-                  <h3>اختر الطبيب</h3>
+                  <h3>اختر الطبيب (اختياري)</h3>
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem', fontFamily: 'Almarai' }}>
+                    يمكنك اختيار طبيب محدد أو تخطي هذه الخطوة
+                  </p>
                 </div>
                 
                 <div className="staff-list" dir="rtl">
@@ -650,7 +1011,6 @@ const ServiceDetails = () => {
                   <button 
                     className="next-btn"
                     onClick={handleNextStep}
-                    disabled={!selectedStaff}
                   >
                     ← التالي
                   </button>
@@ -667,21 +1027,23 @@ const ServiceDetails = () => {
             {/* Step 2: Date & Time */}
             {bookingStep === 2 && (
               <div className="booking-step-content" dir="rtl">
-                {/* Selected Doctor Info */}
-                <div className="selected-doctor-info">
-                  <div className="doctor-info-card">
-                    <img src={selectedStaff?.photo || '/imge.png'} alt={selectedStaff?.name} className="doctor-photo" />
-                    <div className="doctor-details">
-                      <div className="doctor-label">الطبيب</div>
-                      <div className="doctor-name">{selectedStaff?.name_ar || selectedStaff?.name}</div>
+                {/* Selected Doctor Info - Only show if doctor is selected */}
+                {selectedStaff && (
+                  <div className="selected-doctor-info">
+                    <div className="doctor-info-card">
+                      <img src={selectedStaff?.photo || '/imge.png'} alt={selectedStaff?.name} className="doctor-photo" />
+                      <div className="doctor-details">
+                        <div className="doctor-label">الطبيب</div>
+                        <div className="doctor-name">{selectedStaff?.name_ar || selectedStaff?.name}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Date Selection */}
                 <div className="date-selection">
                   <label className="section-label">
-                    التاريخ
+                    التاريخ (اختياري)
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                       <line x1="16" y1="2" x2="16" y2="6"/>
@@ -689,6 +1051,9 @@ const ServiceDetails = () => {
                       <line x1="3" y1="10" x2="21" y2="10"/>
                     </svg>
                   </label>
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem', fontFamily: 'Almarai' }}>
+                    يمكنك اختيار تاريخ محدد أو ترك الحقل فارغاً
+                  </p>
                   <input 
                     type="date" 
                     dir="ltr"
@@ -707,12 +1072,15 @@ const ServiceDetails = () => {
                 {bookingData.date && (
                   <div className="available-times">
                     <label className="section-label">
-                      الأوقات المتاحة
+                      الأوقات المتاحة (اختياري)
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="12" cy="12" r="10"/>
                         <polyline points="12,6 12,12 16,14"/>
                       </svg>
                     </label>
+                    <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem', fontFamily: 'Almarai' }}>
+                      يمكنك اختيار وقت محدد أو ترك الحقل فارغاً
+                    </p>
                     {availableTimesError ? (
                       <div style={{ color: '#b91c1c', background: '#fee2e2', border: '1px solid #fecaca', padding: '0.75rem', borderRadius: '8px', fontSize: '0.9rem' }}>
                         {availableTimesError}
@@ -738,22 +1106,316 @@ const ServiceDetails = () => {
                 {/* Address Selection */}
                 <div className="address-selection">
                   <label className="section-label">
-                    العنوان
+                    العنوان (اختياري)
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                       <circle cx="12" cy="10" r="3"/>
                     </svg>
                   </label>
-                  <select 
-                    value={bookingData.address}
-                    onChange={(e) => setBookingData(prev => ({ ...prev, address: e.target.value }))}
-                    className="address-select"
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem', fontFamily: 'Almarai' }}>
+                    يمكنك اختيار عنوان أو تخطي هذه الخطوة
+                  </p>
+
+                  {/* Current Location Card */}
+                  {latitude && longitude && currentLocationAddress && (
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      marginBottom: '16px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      border: bookingData.address === 'current_location' ? '2px solid #0ea5e9' : '1px solid #e5e7eb',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setBookingData(prev => ({ ...prev, address: 'current_location' }))}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <input
+                          type="radio"
+                          name="address"
+                          checked={bookingData.address === 'current_location'}
+                          onChange={() => setBookingData(prev => ({ ...prev, address: 'current_location' }))}
+                          style={{ width: '16px', height: '16px' }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: '#f0f9ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#0ea5e9',
+                          fontSize: '16px'
+                        }}>
+                          <FaMapMarkerAlt />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ 
+                            margin: '0 0 4px 0', 
+                            fontSize: '16px', 
+                            fontWeight: '600', 
+                            color: '#1f2937',
+                            fontFamily: 'Almarai'
+                          }}>
+                            موقعي الحالي
+                          </h4>
+                          <p style={{ 
+                            margin: '0', 
+                            fontSize: '14px', 
+                            color: '#6b7280',
+                            fontFamily: 'Almarai'
+                          }}>
+                            {currentLocationAddress}
+                          </p>
+                        </div>
+                        {bookingData.address === 'current_location' && (
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#0ea5e9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '12px'
+                          }}>
+                            <FaCheck />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Saved Addresses Cards */}
+                  {addresses.map((addr, idx) => (
+                    <div 
+                      key={`${addr.id}-${idx}`}
+                      style={{
+                        background: 'white',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        marginBottom: '16px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        border: bookingData.address === addr.id ? '2px solid #0ea5e9' : '1px solid #e5e7eb',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setBookingData(prev => ({ ...prev, address: addr.id }))}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <input
+                          type="radio"
+                          name="address"
+                          checked={bookingData.address === addr.id}
+                          onChange={() => setBookingData(prev => ({ ...prev, address: addr.id }))}
+                          style={{ width: '16px', height: '16px' }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ 
+                            margin: '0 0 4px 0', 
+                            fontSize: '16px', 
+                            fontWeight: '600', 
+                            color: '#1f2937',
+                            fontFamily: 'Almarai'
+                          }}>
+                            {addr.label}
+                          </h4>
+                        </div>
+                        {bookingData.address === addr.id && (
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#0ea5e9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '12px'
+                          }}>
+                            <FaCheck />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Add Address Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAddAddressForm(true)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      backgroundColor: '#0171bd',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      fontFamily: 'Almarai',
+                      fontWeight: '600',
+                      marginBottom: '16px'
+                    }}
                   >
-                    <option value="">اختر العنوان</option>
-                    {addresses.map((addr, idx) => (
-                      <option key={`${addr.id}-${idx}`} value={addr.id}>{addr.label}</option>
-                    ))}
-                  </select>
+                    + إضافة عنوان جديد
+                  </button>
+
+                  {/* Add Address Form */}
+                  {showAddAddressForm && (
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      marginTop: '16px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}>
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{
+                          display: 'block',
+                          marginBottom: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#1f2937',
+                          fontFamily: 'Almarai'
+                        }}>
+                          العنوان الجديد
+                        </label>
+                        <input
+                          type="text"
+                          value={newAddress}
+                          onChange={(e) => setNewAddress(e.target.value)}
+                          placeholder="اكتب العنوان هنا"
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            outline: 'none',
+                            transition: 'border-color 0.2s',
+                            fontFamily: 'Almarai'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#0171bd'}
+                          onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !isAddingAddress) {
+                              handleAddNewAddress();
+                            }
+                          }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{
+                          display: 'block',
+                          marginBottom: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#1f2937',
+                          fontFamily: 'Almarai'
+                        }}>
+                          المدينة
+                        </label>
+                        <input
+                          type="text"
+                          value={newCity}
+                          onChange={(e) => setNewCity(e.target.value)}
+                          placeholder="اكتب المدينة هنا"
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            outline: 'none',
+                            transition: 'border-color 0.2s',
+                            fontFamily: 'Almarai'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#0171bd'}
+                          onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !isAddingAddress) {
+                              handleAddNewAddress();
+                            }
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={handleAddNewAddress}
+                          disabled={isAddingAddress || !newAddress.trim() || !newCity.trim()}
+                          style={{
+                            flex: 1,
+                            padding: '12px',
+                            backgroundColor: isAddingAddress ? '#9ca3af' : '#0171bd',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: isAddingAddress || !newAddress.trim() || !newCity.trim() ? 'not-allowed' : 'pointer',
+                            transition: 'background-color 0.2s',
+                            fontFamily: 'Almarai'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isAddingAddress && newAddress.trim() && newCity.trim()) {
+                              e.target.style.backgroundColor = '#015a99';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isAddingAddress) {
+                              e.target.style.backgroundColor = '#0171bd';
+                            }
+                          }}
+                        >
+                          {isAddingAddress ? 'جاري الحفظ...' : 'حفظ العنوان'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowAddAddressForm(false);
+                            setNewAddress('');
+                            setNewCity('');
+                          }}
+                          disabled={isAddingAddress}
+                          style={{
+                            padding: '12px 20px',
+                            backgroundColor: '#6b7280',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: isAddingAddress ? 'not-allowed' : 'pointer',
+                            transition: 'background-color 0.2s',
+                            fontFamily: 'Almarai'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isAddingAddress) {
+                              e.target.style.backgroundColor = '#4b5563';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isAddingAddress) {
+                              e.target.style.backgroundColor = '#6b7280';
+                            }
+                          }}
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Notes */}

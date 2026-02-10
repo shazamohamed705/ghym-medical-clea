@@ -8,7 +8,8 @@ import {
   FaCheckCircle,
   FaEye,
   FaTrash,
-  FaSync
+  FaSync,
+  FaHospital
 } from 'react-icons/fa';
 
 // Bookings filter component - User's bookings history
@@ -237,8 +238,21 @@ const BookingsFilter = () => {
   // Format time
   const formatTime = (timeString) => {
     if (!timeString) return 'غير محدد';
-    const [hours, minutes] = timeString.split(':');
+    
+    // Check if timeString is valid
+    const parts = timeString.split(':');
+    if (parts.length < 2) return 'غير محدد';
+    
+    const [hours, minutes] = parts;
     const hour = parseInt(hours);
+    const minute = parseInt(minutes);
+    
+    // Check if hour is a valid number
+    if (isNaN(hour)) return 'غير محدد';
+    
+    // Ignore 00:00:00 as it's likely a default/empty value
+    if (hour === 0 && minute === 0) return 'غير محدد';
+    
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
@@ -290,48 +304,55 @@ const BookingsFilter = () => {
                 <div className="booking-card-content">
                   <div className="booking-service-section">
                     <div className="service-icon">
-                      <FaStethoscope />
+                      <FaHospital />
                     </div>
                     <div className="service-details">
                       <h4 className="clinic-name">{getClinicName(booking.clinics_id)}</h4>
                       <p className="service-name">{getServiceName(booking)}</p>
+                      
+                      {/* الأزرار تحت اسم الخدمة */}
+                      <div className="booking-actions mt-2">
+                        <button 
+                          className="flex items-center justify-center gap-0.5 px-1.5 py-1 md:px-3 md:py-2 bg-white text-[#0171BD] border-2 border-[#0171BD] rounded-md text-[10px] md:text-sm font-semibold hover:bg-[#0171BD] hover:text-white transition-all min-w-[45px] md:min-w-[60px]"
+                          onClick={() => handleViewBooking(booking)}
+                        >
+                          <FaEye className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                          عرض
+                        </button>
+                        {booking.status !== 1 && (
+                          <button 
+                            className="flex items-center justify-center gap-0.5 px-1.5 py-1 md:px-3 md:py-2 bg-white text-[#10B981] border-2 border-[#10B981] rounded-md text-[10px] md:text-sm font-semibold hover:bg-[#F2FDF7] active:scale-95 transition-all min-w-[45px] md:min-w-[60px]"
+                            onClick={() => handleOpenVerify(booking)}
+                          >
+                            <FaCheckCircle className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                            تحقق
+                          </button>
+                        )}
+                        <button 
+                          className="flex items-center justify-center gap-0.5 px-1.5 py-1 md:px-3 md:py-2 bg-white text-[#EF4444] border-2 border-[#EF4444] rounded-md text-[10px] md:text-sm font-semibold hover:opacity-90 active:scale-95 transition-all min-w-[45px] md:min-w-[60px]"
+                          onClick={() => handleDeleteBooking(booking)}
+                        >
+                          <FaTrash className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                          حذف
+                        </button>
+                      </div>
                     </div>
                   </div>
                   
                   <div className="booking-datetime">
-                    <div className="date-info">
-                      <FaCalendarAlt className="date-icon" />
-                      <span className="date-text">{formatDate(booking.date)}</span>
-                    </div>
-                    <div className="time-info">
-                      <FaClock className="time-icon" />
-                      <span className="time-text">{formatTime(booking.time)}</span>
-                    </div>
+                    {booking.date && (
+                      <div className="date-info">
+                        <FaCalendarAlt className="date-icon" />
+                        <span className="date-text">{formatDate(booking.date)}</span>
+                      </div>
+                    )}
+                    {booking.time && (
+                      <div className="time-info">
+                        <FaClock className="time-icon" />
+                        <span className="time-text">{formatTime(booking.time)}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div className="booking-actions">
-                  <button 
-                    className="view-btn-white"
-                    onClick={() => handleViewBooking(booking)}
-                  >
-                    <FaEye />
-                    عرض
-                  </button>
-                  <button 
-                    className="verify-btn-dashboard"
-                    onClick={() => handleOpenVerify(booking)}
-                  >
-                    <FaCheckCircle />
-                    تحقق
-                  </button>
-                  <button 
-                    className="delete-btn"
-                    onClick={() => handleDeleteBooking(booking)}
-                  >
-                    <FaTrash />
-                    حذف
-                  </button>
                 </div>
               </div>
             );
@@ -365,7 +386,7 @@ const BookingsFilter = () => {
               <div className="grid grid-cols-1 gap-4">
                 <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
                   <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                    <FaStethoscope className="text-white text-sm" />
+                    <FaHospital className="text-white text-sm" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm text-gray-600 font-semibold">الخدمة</div>
@@ -385,7 +406,7 @@ const BookingsFilter = () => {
 
                 <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
                   <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
-                    <FaStethoscope className="text-white text-sm" />
+                    <FaHospital className="text-white text-sm" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm text-gray-600 font-semibold">العيادة</div>
@@ -393,15 +414,21 @@ const BookingsFilter = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                  <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
-                    <FaCalendarAlt className="text-white text-sm" />
+                {(selectedBooking.date || selectedBooking.time) && (
+                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                    <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                      <FaCalendarAlt className="text-white text-sm" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-gray-600 font-semibold">التاريخ والوقت</div>
+                      <div className="text-gray-900 font-medium break-words text-sm">
+                        {selectedBooking.date && formatDate(selectedBooking.date)}
+                        {selectedBooking.date && selectedBooking.time && ' - '}
+                        {selectedBooking.time && formatTime(selectedBooking.time)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm text-gray-600 font-semibold">التاريخ والوقت</div>
-                    <div className="text-gray-900 font-medium break-words text-sm">{formatDate(selectedBooking.date)} - {formatTime(selectedBooking.time)}</div>
-                  </div>
-                </div>
+                )}
 
                 <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -454,7 +481,7 @@ const BookingsFilter = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-4 p-4 bg-white rounded-xl min-h-[80px]">
                 <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                  <FaStethoscope className="text-white text-sm" />
+                  <FaHospital className="text-white text-sm" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-gray-600 font-semibold">الخدمة</div>
@@ -482,15 +509,21 @@ const BookingsFilter = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-white rounded-xl min-h-[80px]">
-                <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <FaCalendarAlt className="text-white text-sm" />
+              {(selectedBooking.date || selectedBooking.time) && (
+                <div className="flex items-center gap-4 p-4 bg-white rounded-xl min-h-[80px]">
+                  <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <FaCalendarAlt className="text-white text-sm" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm text-gray-600 font-semibold">التاريخ والوقت</div>
+                    <div className="text-gray-900 font-medium break-words text-sm leading-tight">
+                      {selectedBooking.date && formatDate(selectedBooking.date)}
+                      {selectedBooking.date && selectedBooking.time && ' - '}
+                      {selectedBooking.time && formatTime(selectedBooking.time)}
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm text-gray-600 font-semibold">التاريخ والوقت</div>
-                  <div className="text-gray-900 font-medium break-words text-sm leading-tight">{formatDate(selectedBooking.date)} - {formatTime(selectedBooking.time)}</div>
-                </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-4 p-4 bg-white rounded-xl min-h-[80px]">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -545,9 +578,14 @@ const BookingsFilter = () => {
                   الرجاء إدخال كود التحقق المرسل إليك
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setOtpCode(value);
+                  }}
                   placeholder="أدخل الكود هنا"
                   autoComplete="off"
                   autoCorrect="off"
@@ -600,9 +638,14 @@ const BookingsFilter = () => {
                 الرجاء إدخال كود التحقق المرسل إليك
               </label>
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '');
+                  setOtpCode(value);
+                }}
                 placeholder="أدخل الكود هنا"
                 autoComplete="off"
                 autoCorrect="off"

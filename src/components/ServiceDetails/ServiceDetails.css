@@ -215,8 +215,8 @@
     transition: all 0.3s ease;
   }
   
-  /* Salon Name Overlay */
-  .salon-name-overlay {
+  /* Clinic Name Overlay */
+  .clinic-name-overlay {
     position: absolute;
     bottom: 20px;
     left: 20px;
@@ -229,14 +229,14 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
   
-  .salon-name-content {
+  .clinic-name-content {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
   }
   
-  .overlay-salon-name {
+  .overlay-clinic-name {
     font-size: 18px;
     font-weight: 600;
     margin: 0;
@@ -245,7 +245,7 @@
     text-align: right;
   }
   
-  .overlay-salon-icon {
+  .overlay-clinic-icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -256,20 +256,20 @@
     flex-shrink: 0;
   }
   
-  .overlay-salon-icon svg {
+  .overlay-clinic-icon svg {
     color: white;
     width: 18px;
     height: 18px;
   }
   
-  /* Salon Information Section */
-  .salon-info-section {
+  /* Clinic Information Section */
+  .clinic-info-section {
     padding: 2rem;
     border-top: 1px solid #e5e7eb;
     background: #f8fafc;
   }
   
-  .salon-info-title {
+  .clinic-info-title {
     font-size: 1.5rem;
     font-weight: 700;
     color: #1e293b;
@@ -280,7 +280,7 @@
     position: relative;
   }
   
-  .salon-info-title::after {
+  .clinic-info-title::after {
     content: '';
     position: absolute;
     bottom: -2px;
@@ -290,14 +290,14 @@
     background: linear-gradient(90deg, #0171BD, #0ea5e9);
   }
   
-  .salon-info-content {
+  .clinic-info-content {
     display: flex;
     flex-direction: column;
     gap: 25px;
   }
   
-  /* Salon Header without photo (photo is main image now) */
-  .salon-header {
+  /* Clinic Header without photo (photo is main image now) */
+  .clinic-header {
     padding: 25px;
     background: white;
     border-radius: 16px;
@@ -306,34 +306,43 @@
     transition: all 0.3s ease;
   }
   
-  .salon-header:hover {
+  .clinic-header:hover {
     transform: translateY(-3px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
   
-  .salon-basic-info {
+  .clinic-basic-info {
     text-align: right;
   }
   
-  .salon-name {
+  .clinic-name {
     font-size: 22px;
     font-weight: 700;
     color: #1e293b;
     margin: 0 0 8px 0;
   }
   
-  .salon-owner {
+  .clinic-owner {
     font-size: 16px;
     color: #64748b;
     margin: 0 0 10px 0;
     font-weight: 500;
   }
   
-  .salon-rating {
+  .clinic-rating {
     display: flex;
     align-items: center;
     gap: 8px;
     justify-content: flex-end;
+  }
+
+  .clinic-price-inline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0171BD;
   }
   
   .rating-stars {
@@ -346,13 +355,13 @@
     font-weight: 600;
   }
   
-  /* Salon Details */
-  .salon-details {
+  /* Clinic Details */
+  .clinic-details {
     display: grid;
     gap: 20px;
   }
   
-  .salon-info-item {
+  .clinic-info-item {
     background: white;
     padding: 20px;
     border-radius: 12px;
@@ -364,35 +373,37 @@
     text-align: right;
   }
   
-  .salon-info-item:hover {
+  .clinic-info-item:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     border-color: #0171BD;
   }
   
-  .salon-info-item strong {
+  .clinic-info-item strong {
     color: #0171BD;
     font-weight: 600;
     margin-left: 10px;
   }
   
-  .salon-hours {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  .clinic-hours {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
     margin-top: 10px;
+    direction: rtl;
   }
   
-  .salon-hours span {
-    padding: 8px 12px;
+  .clinic-hours span {
+    padding: 10px 12px;
     background: #f1f5f9;
     border-radius: 8px;
     font-size: 14px;
     color: #475569;
     border-right: 3px solid #0171BD;
+    text-align: right;
   }
   
-  .salon-about {
+  .clinic-about {
     margin-top: 12px;
     line-height: 1.7;
     color: #475569;
@@ -525,39 +536,39 @@
       height: 100%;
     }
   
-    .salon-name-overlay {
+    .clinic-name-overlay {
       bottom: 15px;
       left: 15px;
       right: 15px;
       padding: 12px 16px;
     }
   
-    .overlay-salon-name {
+    .overlay-clinic-name {
       font-size: 16px;
     }
   
-    .overlay-salon-icon {
+    .overlay-clinic-icon {
       width: 28px;
       height: 28px;
     }
     
-    .salon-info-section {
+    .clinic-info-section {
       padding: 1.5rem 1rem;
     }
     
-    .salon-info-content {
+    .clinic-info-content {
       gap: 20px;
     }
   
-    .salon-header {
+    .clinic-header {
       padding: 20px;
     }
   
-    .salon-basic-info {
+    .clinic-basic-info {
       text-align: center;
     }
   
-    .salon-rating {
+    .clinic-rating {
       justify-content: center;
     }
   }
@@ -589,23 +600,23 @@
       font-size: 1rem;
     }
   
-    .overlay-salon-name {
+    .overlay-clinic-name {
       font-size: 15px;
     }
   
-    .salon-name-overlay {
+    .clinic-name-overlay {
       bottom: 12px;
       left: 12px;
       right: 12px;
       padding: 10px 14px;
     }
   
-    .overlay-salon-icon {
+    .overlay-clinic-icon {
       width: 26px;
       height: 26px;
     }
   
-    .overlay-salon-icon svg {
+    .overlay-clinic-icon svg {
       width: 14px;
       height: 14px;
     }

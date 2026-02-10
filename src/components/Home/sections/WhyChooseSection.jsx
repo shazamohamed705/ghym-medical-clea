@@ -45,14 +45,14 @@ function WhyChooseSection() {
 
   return (
     <section
-      className="relative w-full py-16 bg-gradient-to-r from-[#0171bd]/10 via-[#a6c80d]/20 to-[#a6c80d]/5 -z-10"
+      className="relative w-full py-24 md:py-16 bg-gradient-to-r from-[#0171bd]/10 via-[#a6c80d]/20 to-[#a6c80d]/5 -z-10"
       dir="rtl"
     >
       <div className="container mx-auto px-4">
         <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
 
           {/* المحتوى */}
-          <div className="text-right">
+          <div className="text-right mb-10 md:mb-0">
             <h3
               className="mb-2"
               style={{
@@ -80,7 +80,7 @@ function WhyChooseSection() {
                 verticalAlign: 'middle'
               }}
             >
-              رعاية طبية متكاملة بجودة عالية وخدمات تناسب جميع احتياجاتك
+              {whyUsData?.title_ar || 'رعاية طبية متكاملة بجودة عالية وخدمات تناسب جميع احتياجاتك'}
             </p>
 
             <div className="space-y-3">
@@ -88,13 +88,10 @@ function WhyChooseSection() {
                 whyUsData.points.map((point, index) => (
                   <div
                     key={index}
-                    className="relative flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm overflow-hidden"
+                    className="relative flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm overflow-hidden w-full md:w-[550px] min-h-[65px] md:h-[65px]"
                     style={{
-                      width: '550px',
-                      height: '65px',
                       borderRightWidth: '8px',
-                      borderRightColor: '#0171bd',
-                      maxWidth: '100%'
+                      borderRightColor: '#0171bd'
                     }}
                   >
                     <span className="w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center text-[#0171bd] text-xs">
@@ -127,13 +124,10 @@ function WhyChooseSection() {
                 ].map((item, index) => (
                   <div
                     key={index}
-                    className="relative flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm overflow-hidden"
+                    className="relative flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm overflow-hidden w-full md:w-[550px] min-h-[65px] md:h-[65px]"
                     style={{
-                      width: '550px',
-                      height: '65px',
                       borderRightWidth: '8px',
-                      borderRightColor: '#0171bd',
-                      maxWidth: '100%'
+                      borderRightColor: '#0171bd'
                     }}
                   >
                     <span className="w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center text-[#0171bd] text-xs">
@@ -160,7 +154,7 @@ function WhyChooseSection() {
           </div>
 
           {/* الصور */}
-          <div className="relative w-full flex flex-col items-center gap-6 md:flex-row md:justify-end">
+          <div className="relative w-full flex flex-col items-center gap-6 md:flex-row md:justify-end mt-10 md:mt-0 mb-20 md:mb-0 -translate-x-8 md:translate-x-0">
 
             {/* الصورة الكبيرة */}
             <div className="
@@ -168,8 +162,6 @@ function WhyChooseSection() {
               w-[70%] h-[300px]
               sm:w-[380px] sm:h-[380px]
               md:w-[250px]
-              -mt-10
-              sm:mt-0
               rounded-2xl shadow-lg p-2
             ">
               <img
@@ -210,9 +202,9 @@ function WhyChooseSection() {
             {/* الصورة الصغيرة */}
             <div className="
               absolute
-              -bottom-12 -left-16
-              w-[60%] h-[200px]
-              sm:w-[200px] sm:h-[240px] sm:-bottom-14 sm:-left-24
+              -bottom-32 -left-10
+              w-[50%] h-[180px]
+              sm:w-[200px] sm:h-[240px] sm:-bottom-36 sm:-left-20
               md:-bottom-10 md:-left-40
               md:w-[200px]
               rounded-2xl overflow-hidden shadow-lg p-2

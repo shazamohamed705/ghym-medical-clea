@@ -116,10 +116,166 @@ export const getDoctorsData = () => fetchData('/clinics/staffs');
 export const getBlogsData = () => fetchData('/blogs');
 
 /**
+ * جلب بيانات الاتصال
+ * @returns {Promise} بيانات الاتصال
+ */
+export const getContactData = () => fetchData('/contact-data');
+
+/**
  * جلب بيانات صفحة من نحن
  * @returns {Promise} بيانات صفحة من نحن
  */
 export const getAboutData = () => fetchData('/about');
+
+/**
+ * جلب بيانات البنرات
+ * @returns {Promise} بيانات البنرات
+ */
+export const getBannersData = () => fetchData('/banners');
+
+/**
+ * إرسال رمز التحقق OTP
+ * @param {string} phoneNumber - رقم الهاتف
+ * @returns {Promise} نتيجة إرسال الرمز
+ */
+export const resendOTP = async (phoneNumber) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/resend-otp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ phone_number: phoneNumber })
+    });
+
+    if (!response.ok) {
+      throw new Error(`خطأ في الشبكة: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('خطأ في إرسال رمز التحقق:', error);
+    throw error;
+  }
+};
+
+/**
+ * التحقق من رمز OTP
+ * @param {string} phoneNumber - رقم الهاتف
+ * @param {string} otp - رمز التحقق
+ * @returns {Promise} نتيجة التحقق
+ */
+export const verifyPhoneOTP = async (phoneNumber, otp) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/verify-phone`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ 
+        phone_number: phoneNumber,
+        otp: otp
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`خطأ في الشبكة: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('خطأ في التحقق من الرمز:', error);
+    throw error;
+  }
+};
+
+/**
+ * إرسال رمز التحقق لتغيير كلمة المرور (Reset Password)
+ * @param {string} phoneNumber - رقم الهاتف
+ * @returns {Promise} نتيجة إرسال الرمز
+ */
+export const sendPasswordChangeOTP = async (phoneNumber) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/rest-password/send-otp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ phone_number: phoneNumber })
+    });
+
+    if (!response.ok) {
+      throw new Error(`خطأ في الشبكة: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('خطأ في إرسال رمز تغيير كلمة المرور:', error);
+    throw error;
+  }
+};
+
+/**
+ * التحقق من رمز OTP لتغيير كلمة المرور
+ * @param {string} phoneNumber - رقم الهاتف
+ * @param {string} otp - رمز التحقق
+ * @returns {Promise} نتيجة التحقق
+ */
+export const verifyPasswordChangeOTP = async (phoneNumber, otp) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/rest-password/check-otp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ 
+        phone_number: phoneNumber,
+        otp: otp
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`خطأ في الشبكة: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('خطأ في التحقق من رمز كلمة المرور:', error);
+    throw error;
+  }
+};
+
+/**
+ * تغيير كلمة المرور بعد التحقق من OTP
+ * @param {string} phoneNumber - رقم الهاتف
+ * @param {string} otp - رمز التحقق
+ * @param {string} newPassword - كلمة المرور الجديدة
+ * @returns {Promise} نتيجة تغيير كلمة المرور
+ */
+export const changePasswordWithOTP = async (phoneNumber, otp, newPassword) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/rest-password?phone_number=${phoneNumber}&password=${newPassword}&password_confirmation=${newPassword}&otp=${otp}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`خطأ في الشبكة: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('خطأ في تغيير كلمة المرور:', error);
+    throw error;
+  }
+};
 
 /**
  * جلب بيانات مدونة محددة بالـ ID
@@ -127,6 +283,64 @@ export const getAboutData = () => fetchData('/about');
  * @returns {Promise} بيانات المدونة المحددة
  */
 export const getBlogById = (id) => fetchData(`/blogs/${id}`);
+
+/**
+ * إرسال رمز تسجيل الدخول/التسجيل
+ * @param {string} phoneNumber - رقم الهاتف
+ * @returns {Promise} نتيجة إرسال الرمز
+ */
+export const sendLoginCode = async (phoneNumber) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/send-login-code`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ phone_number: phoneNumber })
+    });
+
+    if (!response.ok) {
+      throw new Error(`خطأ في الشبكة: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('خطأ في إرسال رمز تسجيل الدخول:', error);
+    throw error;
+  }
+};
+
+/**
+ * التحقق من رمز تسجيل الدخول وإنشاء الحساب
+ * @param {string} phoneNumber - رقم الهاتف
+ * @param {string} otp - رمز التحقق
+ * @returns {Promise} نتيجة التحقق وإنشاء الحساب
+ */
+export const verifyLoginCode = async (phoneNumber, otp) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ 
+        phone_number: phoneNumber,
+        otp: otp
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`خطأ في الشبكة: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('خطأ في التحقق من رمز تسجيل الدخول:', error);
+    throw error;
+  }
+};
 
 /**
  * وظيفة عامة للطلبات المخصصة

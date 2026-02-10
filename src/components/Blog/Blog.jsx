@@ -1,22 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import BannerCarousel from '../Banner/BannerCarousel';
 import Footer from '../footer/footer';
-import { getBlogById } from '../../API/apiService';
+import { getContactData } from '../../API/apiService';
 
 function Blog() {
   const [blogData, setBlogData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // دالة لتنظيف HTML entities
+  const cleanHtmlText = (htmlText) => {
+    if (!htmlText) return '';
+    return htmlText
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&[a-z]+;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   useEffect(() => {
     const fetchBlogData = async () => {
       try {
-        // جلب المدونة برقم ID = 5 (يمكن تغييره حسب الحاجة)
-        const data = await getBlogById(5);
+        const data = await getContactData();
         if (data.status === 'success' && data.data) {
-          setBlogData(data.data);
+          // البحث عن info_about_us في البيانات
+          const infoAboutUs = data.data.find(item => item.prefix === 'info_about_us');
+          if (infoAboutUs && infoAboutUs.data) {
+            setBlogData(infoAboutUs.data);
+          }
         }
       } catch (error) {
         console.error('خطأ في جلب بيانات المدونة:', error);
@@ -26,7 +44,7 @@ function Blog() {
     };
 
     fetchBlogData();
-  }, []);
+  }, );
 
   if (isLoading) {
     return (
@@ -88,7 +106,7 @@ function Blog() {
                         textAlign: 'right'
                       }}
                     >
-                    {blogData?.title_ar || 'افضل نوع بوتوكس , دليلك لاختيار الأنسب لك'}
+                    {blogData?.title || 'افضل نوع بوتوكس , دليلك لاختيار الأنسب لك'}
                   </h3>
 
                   <div
@@ -100,7 +118,9 @@ function Blog() {
                       textAlign: 'right'
                     }}
                     dangerouslySetInnerHTML={{
-                      __html: blogData?.description_ar || 'يُعد البوتوكس من أشهر العلاجات التجميلية المستخدمة لمكافحة التجاعيد وعلامات التقدم في العمر، حيث يعمل على إرخاء العضلات المسببة للتجاعيد، مما يمنح البشرة مظهرًا أكثر شبابًا ونضارة. ومع توفر عدة أنواع من البوتوكس في الأسواق، قد يتساءل الكثيرون عن افضل نوع بوتوكس لضمان الحصول على نتائج فعالة وآمنة تدوم لفترة طويلة.'
+                      __html: blogData?.description 
+                        ? cleanHtmlText(blogData.description)
+                        : 'يُعد البوتوكس من أشهر العلاجات التجميلية المستخدمة لمكافحة التجاعيد وعلامات التقدم في العمر، حيث يعمل على إرخاء العضلات المسببة للتجاعيد، مما يمنح البشرة مظهرًا أكثر شبابًا ونضارة. ومع توفر عدة أنواع من البوتوكس في الأسواق، قد يتساءل الكثيرون عن افضل نوع بوتوكس لضمان الحصول على نتائج فعالة وآمنة تدوم لفترة طويلة.'
                     }}
                   />
 
@@ -109,7 +129,7 @@ function Blog() {
                 {/* الصور جنب بعض */}
                 <div className="flex gap-4 w-full lg:w-1/2 justify-center">
                   <img
-                    src="/Rectangle 4.png"
+                    src={blogData?.first_image || "/Rectangle 4.png"}
                     alt="Blog Image 1"
                     className="rounded-lg w-[220px] h-[300px] sm:w-[260px] sm:h-[340px] lg:w-[300px] lg:h-[400px]"
                     style={{
@@ -118,15 +138,21 @@ function Blog() {
                       boxShadow: '0 35px 70px -12px rgba(0, 0, 0, 0.35)',
                       transform: 'translateY(-8px) scale(1.05)'
                     }}
+                    onError={(e) => {
+                      e.target.src = '/Rectangle 4.png'; // Fallback image
+                    }}
                   />
 
                   <img
-                    src="/Rectangle 5.png"
+                    src={blogData?.second_image || "/Rectangle 5.png"}
                     alt="Blog Image 2"
                     className="rounded-lg shadow-lg w-[180px] h-[240px] sm:w-[210px] sm:h-[280px] lg:w-[250px] lg:h-[320px]"
                     style={{
                       objectFit: 'cover',
                       transform: 'translateX(-10px)'
+                    }}
+                    onError={(e) => {
+                      e.target.src = '/Rectangle 5.png'; // Fallback image
                     }}
                   />
                 </div>

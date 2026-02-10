@@ -68,6 +68,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userData', JSON.stringify(userData));
   };
 
+  // وظيفة تحديث بيانات المستخدم
+  const updateUser = (userData) => {
+    setUser(userData);
+    localStorage.setItem('userData', JSON.stringify(userData));
+  };
+
   // وظيفة تسجيل الخروج
   const logout = () => {
     setUser(null);
@@ -85,6 +91,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    updateUser,
     logout,
     isAuthenticated
   };

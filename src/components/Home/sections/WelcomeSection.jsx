@@ -57,7 +57,7 @@ function WelcomeSection() {
     hero_button_text_ar: 'احجز الآن',
     two_image_in_hero_1: '',
     two_image_in_hero_2: '',
-    url_before_image: ''
+    url_before_image: 'https://ghaimcenter.com/laravel/storage/app/public/'
   });
 
   const [loading, setLoading] = useState(true);
@@ -68,13 +68,16 @@ function WelcomeSection() {
       try {
         const response = await getClinicsData();
         if (response.status === 'success' && response.data.home_page_setting) {
+          const settings = response.data.home_page_setting;
+          const baseUrl = response.data.url_before_image || 'https://ghaimcenter.com/laravel/storage/app/public/';
+          
           setHeroData({
-            hero_title_ar: response.data.home_page_setting.hero_title_ar || heroData.hero_title_ar,
-            hero_subtitle_ar: response.data.home_page_setting.hero_subtitle_ar || heroData.hero_subtitle_ar,
-            hero_button_text_ar: response.data.home_page_setting.hero_button_text_ar || heroData.hero_button_text_ar,
-            two_image_in_hero_1: response.data.home_page_setting.two_image_in_hero_1 || '',
-            two_image_in_hero_2: response.data.home_page_setting.two_image_in_hero_2 || '',
-            url_before_image: response.data.url_before_image || ''
+            hero_title_ar: settings.hero_title_ar || heroData.hero_title_ar,
+            hero_subtitle_ar: settings.hero_subtitle_ar || heroData.hero_subtitle_ar,
+            hero_button_text_ar: settings.hero_button_text_ar || heroData.hero_button_text_ar,
+            two_image_in_hero_1: settings.two_image_in_hero_1 || '',
+            two_image_in_hero_2: settings.two_image_in_hero_2 || '',
+            url_before_image: baseUrl
           });
         }
       } catch (error) {
@@ -164,20 +167,24 @@ function WelcomeSection() {
             <div className="relative w-56 h-56 sm:w-64 sm:h-64 md:w-80 md:h-80">
               {/* الدائرة الكبيرة */}
               <div className="absolute bottom-20 left-4 md:top-0 md:left-2 w-52 h-52 sm:w-64 sm:h-64 rounded-full overflow-hidden shadow-xl border-4 border-white">
-                <img
-                  src={heroData.url_before_image && heroData.two_image_in_hero_1 ? heroData.url_before_image + heroData.two_image_in_hero_1 : "/Ellipse 4.png"}
-                  alt="خدمات مجمع غيم الطبي"
-                  className="w-full h-full object-cover"
-                />
+                {heroData.url_before_image && heroData.two_image_in_hero_1 && (
+                  <img
+                    src={heroData.url_before_image + heroData.two_image_in_hero_1}
+                    alt="خدمات مجمع غيم الطبي"
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
 
               {/* الدائرة الصغيرة المتداخلة */}
               <div className="absolute bottom-2 right-0 md:bottom-0 md:right-0 w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden shadow-lg border-4 border-white">
-                <img
-                  src={heroData.url_before_image && heroData.two_image_in_hero_2 ? heroData.url_before_image + heroData.two_image_in_hero_2 : "/Ellipse 3.png"}
-                  alt="ابتسامة وراحة المراجعين"
-                  className="w-full h-full object-cover"
-                />
+                {heroData.url_before_image && heroData.two_image_in_hero_2 && (
+                  <img
+                    src={heroData.url_before_image + heroData.two_image_in_hero_2}
+                    alt="ابتسامة وراحة المراجعين"
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
 
               {/* دوائر ديكورية صغيرة - زرقاء */}

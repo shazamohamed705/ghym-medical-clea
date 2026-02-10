@@ -710,3 +710,31 @@
   transform: translateY(-1px);
 }
 
+/* Clinics Grid Layout - 3 columns on desktop */
+.clinics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+/* Desktop: 3 columns */
+@media (min-width: 768px) {
+  .clinics-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* Tablet: 2 columns */
+@media (min-width: 480px) and (max-width: 767px) {
+  .clinics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Mobile: 1 column */
+@media (max-width: 479px) {
+  .clinics-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

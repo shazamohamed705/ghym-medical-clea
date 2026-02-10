@@ -16,17 +16,16 @@ function TermsOfService() {
         const response = await fetch('https://ghaimcenter.com/laravel/api/terms');
         const result = await response.json();
         
+        // دالة فك ترميز HTML
+        const decodeHTML = (html) => {
+          const txt = document.createElement('textarea');
+          txt.innerHTML = html;
+          return txt.value;
+        };
+        
         if (result.messages === 'success' && result.data) {
-          // إزالة HTML tags وتنسيق النص
-          const cleanContent = result.data
-            .replace(/<pre[^>]*>/g, '')
-            .replace(/<\/pre>/g, '')
-            .replace(/style='[^']*'/g, '')
-            .replace(/font-family:[^;]*;/g, '')
-            .replace(/font-size:[^;]*;/g, '')
-            .trim();
-          
-          setTermsContent(cleanContent);
+          // فك ترميز HTML entities قبل العرض
+          setTermsContent(decodeHTML(result.data));
         } else {
           setError('فشل في تحميل شروط الخدمة');
         }

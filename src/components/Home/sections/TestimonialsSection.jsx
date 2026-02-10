@@ -71,19 +71,37 @@ function TestimonialsSection() {
           </div>
 
           {/* البوكس */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-10 justify-items-center">
+          <div className="
+            flex md:grid
+            md:grid-cols-4
+            gap-4 md:gap-10
+            overflow-x-auto md:overflow-visible
+            snap-x snap-mandatory md:snap-none
+            scrollbar-hide
+            scroll-pl-6
+            px-2
+            py-8 md:py-4
+          ">
 
             {loading ? (
               // مؤشر التحميل
               [...Array(4)].map((_, index) => (
                 <div
                   key={index}
-                  className="bg-white rounded-xl shadow-lg w-full max-w-[550px] h-[250px] flex flex-col p-6 animate-pulse"
+                  className="
+                    bg-white rounded-xl shadow-lg 
+                    w-[80vw] sm:w-[70vw] md:w-full 
+                    max-w-[350px] md:max-w-[550px]
+                    min-h-[260px]
+                    flex flex-col p-6 animate-pulse
+                    flex-shrink-0
+                    snap-center
+                  "
                   style={{
                     boxShadow: '0 10px 25px rgba(0, 113, 189, 0.3), 0 4px 10px rgba(0, 113, 189, 0.2)'
                   }}
                 >
-                  <div className="-mt-10 mb-4">
+                  <div className="-mt-8 md:-mt-10 mb-4">
                     <div className="w-16 h-16 mx-auto rounded-full bg-gray-200"></div>
                   </div>
                   <div className="h-4 bg-gray-200 rounded mb-1"></div>
@@ -104,10 +122,14 @@ function TestimonialsSection() {
              className="
                bg-white rounded-xl shadow-lg text-center
                hover:shadow-2xl transition-all duration-300
-               w-full max-w-[550px] h-[250px]
+               w-[80vw] sm:w-[70vw] md:w-full
+               max-w-[350px] md:max-w-[550px]
+               min-h-[260px]
                flex flex-col
                p-6
                relative
+               flex-shrink-0
+               snap-center
              "
              style={{
                boxShadow: '0 10px 25px rgba(0, 113, 189, 0.3), 0 4px 10px rgba(0, 113, 189, 0.2)'
@@ -136,7 +158,7 @@ function TestimonialsSection() {
            />
 
                 {/* الصورة الدائرية */}
-                <div className="-mt-10 mb-4">
+                <div className="-mt-8 md:-mt-10 mb-4">
                   <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-2 border-white shadow-lg">
                     <img
                       src={testimonial.image}

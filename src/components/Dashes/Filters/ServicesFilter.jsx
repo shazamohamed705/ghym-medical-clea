@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaTooth, FaMoneyBillWave, FaClock, FaMapPin, FaStar, FaPlus, FaStethoscope } from 'react-icons/fa';
+import { FaTooth, FaMoneyBillWave, FaClock, FaMapPin, FaStar, FaPlus, FaStethoscope, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 
 // Services filter component - Available services list
 const ServicesFilter = () => {
@@ -8,7 +8,10 @@ const ServicesFilter = () => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const servicesPerPage = 10;
 
   // Fetch services from API
   useEffect(() => {
@@ -60,16 +63,27 @@ const ServicesFilter = () => {
     navigate(`/service/${service.clinics_id}/${service.id}`);
   };
 
-  // Filter services based on search and category
+  // Filter services based on search
   const filteredServices = (Array.isArray(services) ? services : []).filter(service => {
     if (!service || !service.title_ar || !service.about_ar) return false;
 
     const matchesSearch = service.title_ar.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          service.about_ar.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || service.category_id.toString() === selectedCategory;
 
-    return matchesSearch && matchesCategory;
+    return matchesSearch;
   });
+
+  // Calculate pagination
+  const totalServices = filteredServices.length;
+  const totalPages = Math.ceil(totalServices / servicesPerPage);
+  const startIndex = (currentPage - 1) * servicesPerPage;
+  const endIndex = startIndex + servicesPerPage;
+  const paginatedServices = filteredServices.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   return (
     <div className="services-section">
@@ -89,18 +103,6 @@ const ServicesFilter = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="filter-dropdown">
-          <select 
-            className="filter-select"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-          >
-            <option value="all">جميع الخدمات</option>
-            <option value="1">علاج الأسنان</option>
-            <option value="2">تقويم الأسنان</option>
-          </select>
-          <span className="dropdown-arrow">▼</span>
-        </div>
       </div>
 
       {/* Loading State */}
@@ -113,8 +115,9 @@ const ServicesFilter = () => {
 
       {/* Services Grid */}
       {!loading && (
+        <>
         <div className="services-grid">
-          {filteredServices.map((service) => (
+          {paginatedServices.map((service) => (
           <div key={service.id} className="service-card">
             <div className="service-header">
               <div className="service-icon" style={{ width: 48, height: 48, background: '#0171BD', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -170,6 +173,114 @@ const ServicesFilter = () => {
           </div>
         ))}
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '32px',
+            paddingTop: '24px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            {/* Previous Button */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                background: currentPage === 1 ? '#f3f4f6' : 'white',
+                color: currentPage === 1 ? '#9ca3af' : '#374151',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <FaArrowRight style={{ fontSize: '12px' }} />
+              السابق
+            </button>
+
+            {/* Page Numbers */}
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'center'
+            }}>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                const showPage = 
+                  pageNum === 1 || 
+                  pageNum === totalPages || 
+                  Math.abs(pageNum - currentPage) <= 1;
+                
+                const showEllipsisBefore = pageNum === currentPage - 2 && currentPage > 3;
+                const showEllipsisAfter = pageNum === currentPage + 2 && currentPage < totalPages - 2;
+
+                if (showEllipsisBefore || showEllipsisAfter) {
+                  return (
+                    <span key={pageNum} style={{ padding: '0 6px', color: '#9ca3af', fontSize: '16px' }}>
+                      ...
+                    </span>
+                  );
+                }
+
+                if (!showPage) return null;
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      minWidth: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      border: pageNum === currentPage ? 'none' : '1px solid #d1d5db',
+                      background: pageNum === currentPage ? '#0ea5e9' : 'white',
+                      color: pageNum === currentPage ? 'white' : '#374151',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: pageNum === currentPage ? '600' : '500',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                background: currentPage === totalPages ? '#f3f4f6' : 'white',
+                color: currentPage === totalPages ? '#9ca3af' : '#374151',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              التالي
+              <FaArrowLeft style={{ fontSize: '12px' }} />
+            </button>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

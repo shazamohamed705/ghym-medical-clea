@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getClinicsServices } from '../../../API/apiService';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useToast } from '../../Toast/ToastManager';
 
 function OffersSection() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { showSuccess, showError } = useToast();
 
   // إضافة CSS لإخفاء scrollbar
   useEffect(() => {
@@ -26,6 +30,7 @@ function OffersSection() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('الكل');
   const [clinics, setClinics] = useState([]);
+  const [addingToCart, setAddingToCart] = useState({});
 
   // دالة للتوجيه إلى صفحة التفاصيل
   const handleServiceClick = (clinicId, serviceId) => {
@@ -38,6 +43,61 @@ function OffersSection() {
     navigate(`/service/${clinicId}/${serviceId}`);
   };
 
+  // دالة لإضافة خدمة للسلة
+  const handleAddToCart = async (e, service) => {
+    e.stopPropagation(); // منع فتح صفحة التفاصيل
+    
+    if (!isAuthenticated()) {
+      showError('يرجى تسجيل الدخول أولاً');
+      navigate('/login');
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      showError('يرجى تسجيل الدخول أولاً');
+      navigate('/login');
+      return;
+    }
+
+    setAddingToCart(prev => ({ ...prev, [service.id]: true }));
+
+    try {
+      // إضافة للسلة بدون staff_id (اختياري)
+      const cartData = {
+        service_id: service.id
+      };
+
+      const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(cartData)
+      });
+
+      const result = await response.json();
+      console.log('🛒 Add to cart response:', result);
+      console.log('🛒 Response status:', result.status, 'Type:', typeof result.status);
+
+      if (response.ok && (result.status === true || result.status === 'success')) {
+        console.log('✅ Calling showSuccess');
+        showSuccess('تم إضافة الخدمة للسلة بنجاح');
+        // تحديث عدد العناصر في السلة
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+      } else {
+        console.log('❌ Calling showError');
+        showError(result.message || 'حدث خطأ أثناء إضافة الخدمة للسلة');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      showError('حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setAddingToCart(prev => ({ ...prev, [service.id]: false }));
+    }
+  };
+
   // جلب البيانات من API
   useEffect(() => {
     const fetchServices = async () => {
@@ -46,10 +106,17 @@ function OffersSection() {
         const response = await getClinicsServices();
 
         if (response.status === 'success' && response.data.services) {
-          setServices(response.data.services);
+          // Sort services by updated_at or created_at (newest first)
+          const sortedServices = [...response.data.services].sort((a, b) => {
+            const dateA = new Date(b.updated_at || b.created_at || 0);
+            const dateB = new Date(a.updated_at || a.created_at || 0);
+            return dateA - dateB; // Newest first
+          });
+          
+          setServices(sortedServices);
 
           // استخراج أسماء العيادات الفريدة
-          const uniqueClinicNames = [...new Set(response.data.services.map(service => service.clinic?.clinic_name || `عيادة ${service.clinics_id}`))];
+          const uniqueClinicNames = [...new Set(sortedServices.map(service => service.clinic?.clinic_name || `عيادة ${service.clinics_id}`))];
           setClinics(uniqueClinicNames);
 
           // تعيين الفلتر الافتراضي للعيادة الأولى
@@ -137,7 +204,8 @@ function OffersSection() {
             </div>
           </div>
           <button
-            className="text-xs sm:text-sm text-blue-500 border border-blue-200 px-2 sm:px-3 py-1 rounded whitespace-nowrap"
+            onClick={() => navigate('/services')}
+            className="text-xs sm:text-sm text-blue-500 border border-blue-200 px-2 sm:px-3 py-1 rounded whitespace-nowrap hover:bg-blue-50 hover:border-blue-300 transition-colors duration-200"
             style={{
               fontFamily: 'Almarai',
               fontWeight: 400
@@ -238,21 +306,21 @@ function OffersSection() {
                     }}
                   >
                       {service.price}
-                    <svg className="inline w-4 h-4 mx-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/>
-                      <path d="M8 12h8"/>
-                      <path d="M8 9h8"/>
-                    </svg>
+                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="15" height="15" aria-label="Saudi Riyal" title="Saudi Riyal" style={{display: 'inline-block', verticalAlign: 'middle'}}>
+                          <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                          <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                        </svg>
                   </span>
                   <button
-                      onClick={(e) => handleBookingClick(e, service.clinics_id, service.id)}
-                      className="text-blue-500 border border-blue-200 px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-50 transition-colors font-bold"
+                      onClick={(e) => handleAddToCart(e, service)}
+                      disabled={addingToCart[service.id]}
+                      className="text-blue-500 border border-blue-200 px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-50 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       fontFamily: 'Almarai',
                       fontWeight: 700
                     }}
                   >
-                    احجز الآن
+                    {addingToCart[service.id] ? 'جاري الإضافة...' : 'أضف للسلة'}
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17" />
                     </svg>

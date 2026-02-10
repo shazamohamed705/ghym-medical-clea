@@ -1,22 +1,74 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getBannersData } from '../../API/apiService';
 
 function BannerCarousel() {
-  const banners = useMemo(() => [
-    '/Property 1=banner 1 1.png',
-    '/Property 1=banner 2.png',
-    '/Property 1=banner 3.png',
-    '/Property 1=Banner 4 1.png'
-  ], []);
-
+  const [banners, setBanners] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
-    }, 5000); // Change banner every 5 seconds
+    const fetchBanners = async () => {
+      try {
+        setLoading(true);
+        const response = await getBannersData();
+        
+        if (response.status && response.data && Array.isArray(response.data)) {
+          setBanners(response.data);
+        } else {
+          console.error('Invalid banners data structure:', response);
+          setError('فشل في تحميل البنرات');
+        }
+      } catch (error) {
+        console.error('Error fetching banners:', error);
+        setError('فشل في تحميل البنرات');
+        // Fallback to static banners if API fails
+        setBanners([
+          { id: 1, image: '/Property 1=banner 1 1.png' },
+          { id: 2, image: '/Property 1=banner 2.png' },
+          { id: 3, image: '/Property 1=banner 3.png' },
+          { id: 4, image: '/Property 1=Banner 4 1.png' }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => clearInterval(interval);
+    fetchBanners();
+  }, []);
+
+  useEffect(() => {
+    if (banners.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
+      }, 5000); // Change banner every 5 seconds
+
+      return () => clearInterval(interval);
+    }
   }, [banners.length]);
+
+  if (loading) {
+    return (
+      <div className="relative w-full h-[250px] sm:h-[350px] md:h-[750px] lg:h-[800px] xl:h-[850px] bg-gray-200 animate-pulse flex items-center justify-center">
+        <div className="text-gray-500 font-['Almarai']">جاري تحميل البنرات...</div>
+      </div>
+    );
+  }
+
+  if (error && banners.length === 0) {
+    return (
+      <div className="relative w-full h-[250px] sm:h-[350px] md:h-[750px] lg:h-[800px] xl:h-[850px] bg-gray-100 flex items-center justify-center">
+        <div className="text-gray-600 font-['Almarai'] text-center">
+          <p>{error}</p>
+          <p className="text-sm mt-2">يرجى المحاولة مرة أخرى لاحقاً</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (banners.length === 0) {
+    return null;
+  }
 
   return (
     <div className="relative w-full overflow-hidden" dir="ltr">
@@ -29,15 +81,19 @@ function BannerCarousel() {
       >
         {banners.map((banner, index) => (
           <div 
-            key={index} 
-            className="flex-shrink-0 h-[200px] sm:h-[280px] md:h-[350px] lg:h-[400px] xl:h-[420px]"
+            key={banner.id || index} 
+            className="flex-shrink-0 h-[250px] sm:h-[350px] md:h-[650px] lg:h-[700px] xl:h-[750px]"
             style={{ width: `${100 / banners.length}%` }}
           >
             <img 
-              src={banner} 
+              src={banner.image} 
               alt={`Banner ${index + 1}`}
               className="w-full h-full object-cover"
               loading={index === 0 ? 'eager' : 'lazy'}
+              onError={(e) => {
+                console.error('Error loading banner image:', banner.image);
+                e.target.style.display = 'none';
+              }}
             />
           </div>
         ))}

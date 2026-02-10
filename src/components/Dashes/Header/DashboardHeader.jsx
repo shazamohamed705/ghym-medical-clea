@@ -31,7 +31,7 @@ const DashboardHeader = memo(({
   onLogoutClick, 
   onFilterSelect,
   filterItems = [],
-  activeFilter = 'الرئيسية'
+  activeFilter = 'لوحة التحكم الرئيسية'
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);

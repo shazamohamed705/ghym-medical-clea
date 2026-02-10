@@ -55,9 +55,14 @@ const OTPVerificationPopup = ({ isOpen, onClose, onVerify, bookingId }) => {
                 أدخل كود التحقق:
               </label>
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '');
+                  setOtp(value);
+                }}
                 placeholder="أدخل OTP"
                 required
                 maxLength="6"
@@ -108,9 +113,14 @@ const OTPVerificationPopup = ({ isOpen, onClose, onVerify, bookingId }) => {
                 أدخل كود التحقق:
               </label>
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '');
+                  setOtp(value);
+                }}
                 placeholder="أدخل OTP"
                 required
                 maxLength="6"
@@ -229,7 +239,7 @@ const HomeFilter = () => {
         console.log('🔄 New bookings IDs:', bookingsArray.map(b => b.id));
         
         // Get unique clinic IDs from bookings
-        const clinicIds = [...new Set(bookingsArray.map(b => b.salon_id).filter(id => id))];
+        const clinicIds = [...new Set(bookingsArray.map(b => b.clinics_id || b.salon_id).filter(id => id))];
         console.log('🏥 Unique clinic IDs:', clinicIds);
 
         // Fetch clinic data for all unique clinic IDs
@@ -329,7 +339,8 @@ const HomeFilter = () => {
     
     const confirmed = bookings.filter(booking => {
       console.log('🔄 Checking booking:', booking.id, 'status:', booking.status, 'date:', booking.date);
-      return booking.status === 1 && booking.date >= today;
+      // Show confirmed bookings that either have no date or have a future date
+      return booking.status === 1 && (!booking.date || booking.date >= today);
     });
     console.log('✅ Confirmed upcoming bookings:', confirmed);
     
@@ -348,7 +359,8 @@ const HomeFilter = () => {
             console.log('🔍 Using staff name from API booking data:', doctorName);
           } else {
             // Fallback to clinic staff data if API didn't provide staff info
-            const clinicInfo = staffData[booking.salon_id];
+            const clinicId = booking.clinics_id || booking.salon_id;
+            const clinicInfo = staffData[clinicId];
             if (clinicInfo?.staff && Array.isArray(clinicInfo.staff) && booking.staff_id) {
               const selectedStaff = clinicInfo.staff.find(s => s.id === booking.staff_id);
               if (selectedStaff) {
@@ -402,7 +414,8 @@ const HomeFilter = () => {
         console.log('🔍 Using staff name from API booking data:', doctorName);
       } else {
         // Fallback to clinic staff data if API didn't provide staff info
-        const clinicInfo = staffData[booking.salon_id];
+        const clinicId = booking.clinics_id || booking.salon_id;
+        const clinicInfo = staffData[clinicId];
         if (clinicInfo?.staff && Array.isArray(clinicInfo.staff) && booking.staff_id) {
           const selectedStaff = clinicInfo.staff.find(s => s.id === booking.staff_id);
           if (selectedStaff) {
@@ -442,9 +455,21 @@ const HomeFilter = () => {
   const formatTime = (timeString) => {
     if (!timeString) return 'غير محدد';
     
+    // Check if timeString is valid
+    const parts = timeString.split(':');
+    if (parts.length < 2) return 'غير محدد';
+    
     // Convert 24-hour format to 12-hour format with AM/PM
-    const [hours, minutes] = timeString.split(':');
+    const [hours, minutes] = parts;
     const hour = parseInt(hours);
+    const minute = parseInt(minutes);
+    
+    // Check if hour is a valid number
+    if (isNaN(hour)) return 'غير محدد';
+    
+    // Ignore 00:00:00 as it's likely a default/empty value
+    if (hour === 0 && minute === 0) return 'غير محدد';
+    
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     
@@ -463,7 +488,17 @@ const HomeFilter = () => {
   // Resolve service name from booking using clinic services by ID
   // Prefer Arabic title, fallback to other name fields
   const getServiceName = (booking) => {
-    const clinicInfo = staffData[booking.salon_id];
+    // Try to get service name from booking.service object first (comes from API)
+    if (booking.service && booking.service.title_ar) {
+      return booking.service.title_ar;
+    }
+    if (booking.service && (booking.service.title || booking.service.name)) {
+      return booking.service.title || booking.service.name;
+    }
+
+    // Fallback to clinic services data
+    const clinicId = booking.clinics_id || booking.salon_id;
+    const clinicInfo = staffData[clinicId];
     const serviceId = booking.service_id || booking.serviceId;
 
     if (clinicInfo?.services && Array.isArray(clinicInfo.services) && serviceId) {
@@ -507,7 +542,7 @@ const HomeFilter = () => {
         </h1>
         <div className="ios-last-update">
           <FaClock className="ios-clock-icon" />
-          آخر تحديث: ١٤٤٧/٤/٢٠ هـ
+          آخر تحديث: {new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: '2-digit', day: '2-digit' })}
         </div>
       </div>
 
@@ -643,11 +678,11 @@ const HomeFilter = () => {
                       </div>
                       <div className="bookings-table-cell" data-label="التاريخ">
                         <FaCalendarAlt className="bookings-cell-icon" />
-                        <span>{formatDate(booking.date)}</span>
+                        <span>{booking.date ? formatDate(booking.date) : 'غير محدد'}</span>
                       </div>
                       <div className="bookings-table-cell" data-label="الوقت">
                         <FaClock className="bookings-cell-icon" />
-                        <span>{formatTime(booking.time)}</span>
+                        <span>{formatTime(booking.time) || 'غير محدد'}</span>
                       </div>
                       <div className="bookings-table-cell" data-label="الحالة">
                         <span className={`bookings-status-badge bookings-status-${getStatusInfo(booking.status).color}`}>
@@ -729,7 +764,10 @@ const HomeFilter = () => {
                 <div key={appointment.id} className="ios-appointment-item">
                   <div className="appointment-date-service">
                     <FaCalendarAlt className="appointment-icon" />
-                    <span className="one-line">{appointment.serviceName} - {formatDate(appointment.date)}</span>
+                    <span className="one-line">
+                      {appointment.serviceName}
+                      {appointment.date && ` - ${formatDate(appointment.date)}`}
+                    </span>
                   </div>
                   <div className="appointment-doctor">
                     <FaUser className="appointment-icon" />
