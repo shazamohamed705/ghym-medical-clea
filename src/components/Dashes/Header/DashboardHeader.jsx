@@ -1,4 +1,5 @@
 import React, { memo, useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   FaHome, 
   FaSignOutAlt, 
@@ -33,6 +34,7 @@ const DashboardHeader = memo(({
   filterItems = [],
   activeFilter = 'لوحة التحكم الرئيسية'
 }) => {
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -87,9 +89,15 @@ const DashboardHeader = memo(({
 
   // Close menu when filter is selected
   const handleFilterClick = useCallback((item) => {
-    onFilterSelect(item);
-    closeMenuWithAnimation();
-  }, [onFilterSelect, closeMenuWithAnimation]);
+    // إذا كان الفلتر "حجز جديد"، انتقل إلى صفحة Booking
+    if (item.id === 'حجز جديد') {
+      navigate('/booking', { state: { fromDashboard: true } });
+      closeMenuWithAnimation();
+    } else {
+      onFilterSelect(item);
+      closeMenuWithAnimation();
+    }
+  }, [onFilterSelect, closeMenuWithAnimation, navigate]);
 
   // Close menu when clicking outside
   const handleBackdropClick = useCallback(() => {

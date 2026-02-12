@@ -1,7 +1,7 @@
 
-
 import React, { useState, useEffect, memo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { createUniqueSlug } from '../../utils/slugUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { getClinicsCategories } from '../../API/apiService';
 
@@ -126,33 +126,41 @@ function MainNavbar() {
     };
   }, [isAuthenticated]);
 
-  // جلب عدد عناصر السلة
+  // جلب عدد عناصر السلة (محلي + API)
   useEffect(() => {
     const fetchCartCount = async () => {
-      if (!isAuthenticated()) {
-        setCartCount(0);
-        return;
-      }
-
       try {
         const token = localStorage.getItem('authToken');
-        if (!token) return;
+        let count = 0;
+        
+        // عدد العناصر المحلية
+        const localCart = JSON.parse(localStorage.getItem('ghaim_local_cart') || '[]');
+        count += localCart.length;
+        
+        // إذا كان المستخدم مسجل دخول، جلب عدد العناصر من الـ API
+        if (token && isAuthenticated()) {
+          try {
+            const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
 
-        const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.status === true || result.status === 'success') {
-            if (result.data && Array.isArray(result.data)) {
-              setCartCount(result.data.length);
+            if (response.ok) {
+              const result = await response.json();
+              if (result.status === true || result.status === 'success') {
+                if (result.data && Array.isArray(result.data)) {
+                  count += result.data.length;
+                }
+              }
             }
+          } catch (error) {
+            console.error('Error fetching API cart count:', error);
           }
         }
+        
+        setCartCount(count);
       } catch (error) {
         console.error('Error fetching cart count:', error);
         setCartCount(0);
@@ -241,19 +249,18 @@ function MainNavbar() {
 
   // وظيفة التعامل مع النقر على السلة
   const handleCartClick = () => {
-    if (isAuthenticated()) {
-      navigate('/cart'); // التوجيه لصفحة السلة المستقلة
-    } else {
-      navigate('/login'); // التوجيه لتسجيل الدخول إذا مش مسجل
-    }
+    navigate('/cart'); // التوجيه لصفحة السلة المستقلة
   };
 
   // وظيفة التعامل مع النقر على قسم
   const handleCategoryClick = useCallback((category) => {
     setCategoriesDropdownOpen(false);
 
-    // توجيه لصفحة Category لعرض جميع الخدمات في هذه الفئة
-    navigate('/category', { state: { categoryId: category.id } });
+    // إنشاء رابط بسيط مع اسم الكاتيجوري و ID
+    const categoryName = category.title_ar || category.title;
+    
+    // توجيه لصفحة Category باستخدام الاسم و ID
+    navigate(`/category/${categoryName}/${category.id}`);
   }, [navigate]);
 
   // وظيفة البحث في الخدمات
@@ -393,8 +400,9 @@ function MainNavbar() {
   const handleSearchResultClick = (service) => {
     setShowSearchResults(false);
     setSearchQuery('');
-    // التوجه لصفحة تفاصيل الخدمة بنفس طريقة FeaturesSection
-    navigate(`/service/${service.clinic_id || service.clinics_id || 1}/${service.id}`);
+    // التوجه لصفحة تفاصيل الخدمة باستخدام slug
+    const slug = createUniqueSlug(service.title_ar || service.title, service.id);
+    navigate(`/service/${slug}`);
   };
 
   return (
@@ -423,7 +431,7 @@ function MainNavbar() {
         {/* Account & Cart Icons - اليمين */}
         <div className="flex items-center gap-3">
           {/* Cart Icon */}
-          <div className="relative cursor-pointer" onClick={handleCartClick}>
+          <div className="relative cursor-pointer" onClick={handleCartClick} data-cart-icon>
             <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
@@ -708,7 +716,7 @@ function MainNavbar() {
               {isAuthenticated() ? 'الحساب' : 'سجل الدخول'}
             </span>
           </div>
-          <div className="relative cursor-pointer" onClick={handleCartClick}>
+          <div className="relative cursor-pointer" onClick={handleCartClick} data-cart-icon>
             <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>

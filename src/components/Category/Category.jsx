@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, Link, useSearchParams, useParams } from 'react-router-dom';
+import { createUniqueSlug, extractIdFromSlug } from '../../utils/slugUtils';
+import { addToLocalCart } from '../../utils/cartUtils';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import BannerCarousel from '../Banner/BannerCarousel';
 import Footer from '../footer/footer';
-import { getClinicsServices, getClinicsCategories } from '../../API/apiService';
+import Pagination from '../Pagination/Pagination';
+import { getClinicsServices, getClinicsCategories, getClinicsData } from '../../API/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/ToastManager';
 
@@ -12,6 +15,7 @@ function Category() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { categoryName, categoryId, clinicSlug } = useParams(); // قراءة من URL params
   const { isAuthenticated } = useAuth();
   const { showSuccess, showError } = useToast();
   const [services, setServices] = useState([]);
@@ -20,40 +24,114 @@ function Category() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [addingToCart, setAddingToCart] = useState({});
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // عدد الخدمات في كل صفحة
+  const servicesGridRef = useRef(null); // ref للكروت
 
-  const clinicId = location.state?.clinicId;
-  const categoryId = location.state?.categoryId;
+  // استخراج clinic ID من slug إذا كان موجوداً
+  const clinicIdFromSlug = clinicSlug ? extractIdFromSlug(clinicSlug) : null;
+  
+  const clinicId = clinicIdFromSlug || location.state?.clinicId;
+  const clinicName = location.state?.clinicName; // اسم العيادة من state
+  const clinicData = location.state?.clinicData; // بيانات العيادة الكاملة من state
+  const finalCategoryId = categoryId || location.state?.categoryId; // قراءة من URL params أولاً
   const searchQuery = searchParams.get('query'); // جلب query من URL
   const laserClinicIds = location.state?.laserClinicIds; // جلب clinic IDs من إرشادات الليزر
   const isLaserBooking = location.state?.isLaserBooking; // علامة أن هذا من إرشادات الليزر
 
-  const handleBookingClick = (serviceId, serviceClinicId) => {
-    navigate(`/service/${serviceClinicId || clinicId}/${serviceId}`);
+  const handleBookingClick = (service) => {
+    const slug = createUniqueSlug(service.service, service.id);
+    navigate(`/service/${slug}`);
   };
 
   // دالة لإضافة خدمة للسلة
-  const handleAddToCart = async (e, service) => {
+  const handleAddToCart = async (e, service, imageElement) => {
     e.stopPropagation();
-    
-    if (!isAuthenticated()) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     const token = localStorage.getItem('authToken');
-    if (!token) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     setAddingToCart(prev => ({ ...prev, [service.id]: true }));
 
     try {
-      // إضافة للسلة بدون staff_id (اختياري)
+      // Create flying image animation
+      if (imageElement) {
+        const imageRect = imageElement.getBoundingClientRect();
+        
+        // Find cart icon in navbar
+        const cartIcon = document.querySelector('[data-cart-icon]');
+        if (!cartIcon) {
+          console.error('Cart icon not found');
+        }
+        
+        const cartRect = cartIcon ? cartIcon.getBoundingClientRect() : { top: 0, left: window.innerWidth };
+
+        // Create flying image clone
+        const flyingImage = imageElement.cloneNode(true);
+        flyingImage.style.position = 'fixed';
+        flyingImage.style.top = `${imageRect.top}px`;
+        flyingImage.style.left = `${imageRect.left}px`;
+        flyingImage.style.width = `${imageRect.width}px`;
+        flyingImage.style.height = `${imageRect.height}px`;
+        flyingImage.style.zIndex = '10000';
+        flyingImage.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        flyingImage.style.pointerEvents = 'none';
+        flyingImage.style.borderRadius = '1rem';
+        
+        document.body.appendChild(flyingImage);
+
+        // Trigger animation
+        setTimeout(() => {
+          flyingImage.style.top = `${cartRect.top}px`;
+          flyingImage.style.left = `${cartRect.left}px`;
+          flyingImage.style.width = '50px';
+          flyingImage.style.height = '50px';
+          flyingImage.style.opacity = '0.3';
+        }, 50);
+
+        // Remove flying image after animation
+        setTimeout(() => {
+          document.body.removeChild(flyingImage);
+        }, 900);
+      }
+
+      // Get service image and price
+      const serviceImage = service.images?.[0]?.image || service.image || '/1.png';
+      const servicePrice = service.newPrice || service.ghaim_price || service.price || 0;
+
+      // إذا لم يكن هناك token، احفظ في localStorage
+      if (!token) {
+        addToLocalCart({
+          service_id: service.id,
+          title_ar: service.title_ar || service.title || service.service,
+          title: service.title,
+          price: servicePrice,
+          image: serviceImage,
+          images: service.images,
+          about_ar: service.about_ar
+        });
+
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: serviceImage,
+            title: service.title_ar || service.title || service.service,
+            price: servicePrice,
+            id: service.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/login')
+        });
+
+        setAddingToCart(prev => ({ ...prev, [service.id]: false }));
+        return;
+      }
+
+      // إضافة للسلة عبر API
       const cartData = {
-        service_id: service.id
+        carts: [{ service_id: service.id }]
       };
 
       const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
@@ -71,7 +149,20 @@ function Category() {
 
       if (response.ok && (result.status === true || result.status === 'success')) {
         console.log('✅ Calling showSuccess');
-        showSuccess('تم إضافة الخدمة للسلة بنجاح');
+        
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: serviceImage,
+            title: service.title_ar || service.title || service.service,
+            price: servicePrice,
+            id: service.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/dashboard?filter=NewBooking')
+        });
+        
         window.dispatchEvent(new CustomEvent('cartUpdated'));
       } else {
         console.log('❌ Calling showError');
@@ -86,9 +177,33 @@ function Category() {
   };
 
   useEffect(() => {
+    document.title = 'الفئات والخدمات - مجمع غيم الطبي';
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+
+        // إذا كان هناك clinicId من slug، نجلب بيانات العيادة أولاً
+        if (clinicIdFromSlug && !clinicData) {
+          try {
+            const clinicsResponse = await getClinicsData();
+            if (clinicsResponse.status === 'success' && clinicsResponse.data.data) {
+              const foundClinic = clinicsResponse.data.data.find(c => c.id === clinicIdFromSlug);
+              if (foundClinic) {
+                setClinic({ 
+                  clinic_name: foundClinic.clinic_name,
+                  id: foundClinic.id,
+                  owner_photo: foundClinic.owner_photo,
+                  ...foundClinic
+                });
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching clinic data:', err);
+          }
+        }
 
         // إذا كان هناك searchQuery، نبحث في الخدمات
         if (searchQuery) {
@@ -166,18 +281,18 @@ function Category() {
             let filteredServices = allServices;
             let selectedCategory = null;
 
-            if (categoryId) {
+            if (finalCategoryId) {
               // فلترة الخدمات حسب categoryId
               filteredServices = allServices.filter(service =>
-                service.category_id === categoryId
+                service.category_id === parseInt(finalCategoryId)
               );
-              console.log('🔍 Filtering by categoryId:', categoryId);
+              console.log('🔍 Filtering by categoryId:', finalCategoryId);
               console.log('🔍 All services before filter:', allServices.length);
               console.log('🔍 Filtered services by category:', filteredServices.length);
               
               // العثور على الكاتيجوري المحددة
               if (categoriesResponse.status === 'success' && categoriesResponse.data) {
-                selectedCategory = categoriesResponse.data.find(cat => cat.id === categoryId);
+                selectedCategory = categoriesResponse.data.find(cat => cat.id === parseInt(finalCategoryId));
               }
             } else if (laserClinicIds && Array.isArray(laserClinicIds) && laserClinicIds.length > 0) {
               // فلترة الخدمات حسب laserClinicIds (من إرشادات الليزر)
@@ -265,14 +380,22 @@ function Category() {
             console.log('✅ Category/Clinic Services Count:', formattedServices.length);
             console.log('✅ Selected Category:', selectedCategory);
             console.log('✅ Clinic Data:', filteredServices.length > 0 ? filteredServices[0].clinic : 'No clinic data');
+            console.log('✅ Clinic Name from state:', clinicName);
+            console.log('✅ Clinic Data from state:', clinicData);
 
             // تعيين العيادة أو الكاتيجوري المحددة
             if (selectedCategory) {
               setClinic({ ...selectedCategory, isCategory: true });
             } else if (isLaserBooking) {
               setClinic({ isLaserBooking: true, clinicCount: laserClinicIds?.length || 0 });
+            } else if (clinicData) {
+              // استخدام بيانات العيادة من state إذا كانت متوفرة
+              setClinic({ clinic_name: clinicData.title, ...clinicData });
             } else if (filteredServices.length > 0) {
               setClinic(filteredServices[0].clinic);
+            } else if (clinicName) {
+              // استخدام اسم العيادة من state كحل احتياطي
+              setClinic({ clinic_name: clinicName });
             } else {
               setClinic(null);
             }
@@ -295,14 +418,17 @@ function Category() {
       }
     };
 
-    // تشغيل الجلب إذا كان لدينا clinicId أو categoryId أو searchQuery
-    if (clinicId || categoryId || searchQuery) {
+    // تشغيل الجلب إذا كان لدينا clinicId أو categoryId أو searchQuery أو clinicSlug
+    if (clinicId || finalCategoryId || searchQuery || clinicSlug) {
       fetchData();
     } else {
       // إذا لم يكن لدينا معرف محدد، نعرض جميع الكاتيجوري مع خدماتها
       fetchData();
     }
-  }, [clinicId, categoryId, searchQuery]);
+    
+    // Reset pagination when category changes
+    setCurrentPage(1);
+  }, [clinicId, finalCategoryId, searchQuery, clinicSlug]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50" dir="ltr">
@@ -401,9 +527,17 @@ function Category() {
         )}
 
         {/* الكروت */}
-        {!loading && !error && services.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8 place-items-center">
-            {services.map((service) => {
+        {!loading && !error && services.length > 0 && (() => {
+          // حساب pagination
+          const totalPages = Math.ceil(services.length / itemsPerPage);
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          const currentServices = services.slice(startIndex, endIndex);
+          
+          return (
+            <>
+              <div ref={servicesGridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8 place-items-center">
+                {currentServices.map((service) => {
               return (
                 <div
                   key={service.id}
@@ -417,6 +551,9 @@ function Category() {
                 {/* الصورة */}
                 <div className="relative w-full h-80 overflow-hidden bg-gray-100 rounded-t-xl">
                   <img
+                    ref={(el) => {
+                      if (el) el.dataset.serviceId = service.id;
+                    }}
                     src={service.image}
                     alt={service.service}
                     className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
@@ -434,7 +571,10 @@ function Category() {
 
                   {/* أيقونة السلة */}
                   <button
-                    onClick={(e) => handleAddToCart(e, service)}
+                    onClick={(e) => {
+                      const img = e.currentTarget.parentElement.querySelector('img');
+                      handleAddToCart(e, service, img);
+                    }}
                     disabled={addingToCart[service.id]}
                     className="absolute top-3 left-3 w-10 h-10 bg-white hover:bg-blue-50 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed z-20"
                     title="أضف للسلة"
@@ -454,7 +594,7 @@ function Category() {
                   {/* زر التفاصيل الثابت */}
                   <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2">
                     <button
-                      onClick={() => handleBookingClick(service.id, service.clinicId || service.clinic?.id)}
+                      onClick={() => handleBookingClick(service)}
                       className="py-2 px-6 bg-gradient-to-r from-[#0171bd] to-[#015a99] text-white rounded-lg font-bold text-sm hover:from-[#015a99] hover:to-[#013d73] shadow-lg hover:shadow-xl cursor-pointer transition-all duration-300"
                       style={{ fontFamily: 'Almarai' }}
                     >
@@ -548,7 +688,19 @@ function Category() {
             );
           })}
           </div>
-        )}
+          
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            totalItems={services.length}
+            scrollToRef={servicesGridRef}
+          />
+        </>
+          );
+        })()}
 
       </div>
 

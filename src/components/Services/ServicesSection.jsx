@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createUniqueSlug } from '../../utils/slugUtils';
+import { addToLocalCart } from '../../utils/cartUtils';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import BannerCarousel from '../Banner/BannerCarousel';
 import Footer from '../footer/footer';
+import Pagination from '../Pagination/Pagination';
 import { getClinicsServices } from '../../API/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/ToastManager';
@@ -18,35 +21,99 @@ function ServicesSection() {
   const [activeFilter, setActiveFilter] = useState('الكل');
   const [clinics, setClinics] = useState([]);
   const [addingToCart, setAddingToCart] = useState({});
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
+  const servicesGridRef = useRef(null);
 
   // دالة للتوجيه إلى صفحة التفاصيل
-  const handleServiceClick = (clinicId, serviceId) => {
-    navigate(`/service/${clinicId}/${serviceId}`);
+  const handleServiceClick = (service) => {
+    const slug = createUniqueSlug(service.title_ar || service.title, service.id);
+    navigate(`/service/${slug}`);
   };
 
   // دالة لإضافة خدمة للسلة
-  const handleAddToCart = async (e, service) => {
+  const handleAddToCart = async (e, service, imageElement) => {
     e.stopPropagation();
-    
-    if (!isAuthenticated()) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     const token = localStorage.getItem('authToken');
-    if (!token) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     setAddingToCart(prev => ({ ...prev, [service.id]: true }));
 
     try {
-      // إضافة للسلة بدون staff_id (اختياري)
+      // Create flying image animation
+      if (imageElement) {
+        const imageRect = imageElement.getBoundingClientRect();
+        
+        // Find cart icon in navbar
+        const cartIcon = document.querySelector('[data-cart-icon]');
+        const cartRect = cartIcon ? cartIcon.getBoundingClientRect() : { top: 0, left: window.innerWidth };
+
+        // Create flying image clone
+        const flyingImage = imageElement.cloneNode(true);
+        flyingImage.style.position = 'fixed';
+        flyingImage.style.top = `${imageRect.top}px`;
+        flyingImage.style.left = `${imageRect.left}px`;
+        flyingImage.style.width = `${imageRect.width}px`;
+        flyingImage.style.height = `${imageRect.height}px`;
+        flyingImage.style.zIndex = '10000';
+        flyingImage.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        flyingImage.style.pointerEvents = 'none';
+        flyingImage.style.borderRadius = '1rem';
+        
+        document.body.appendChild(flyingImage);
+
+        // Trigger animation
+        setTimeout(() => {
+          flyingImage.style.top = `${cartRect.top}px`;
+          flyingImage.style.left = `${cartRect.left}px`;
+          flyingImage.style.width = '50px';
+          flyingImage.style.height = '50px';
+          flyingImage.style.opacity = '0.3';
+        }, 50);
+
+        // Remove flying image after animation
+        setTimeout(() => {
+          document.body.removeChild(flyingImage);
+        }, 900);
+      }
+
+      // Get service image
+      const serviceImage = service.images?.[0]?.image || service.image || '/1.png';
+
+      // إذا لم يكن هناك token، احفظ في localStorage
+      if (!token) {
+        addToLocalCart({
+          service_id: service.id,
+          title_ar: service.title_ar || service.title || service.service,
+          title: service.title,
+          price: service.price,
+          image: serviceImage,
+          images: service.images,
+          about_ar: service.about_ar
+        });
+
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: serviceImage,
+            title: service.title_ar || service.title || service.service,
+            price: service.price,
+            id: service.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/login')
+        });
+
+        setAddingToCart(prev => ({ ...prev, [service.id]: false }));
+        return;
+      }
+
+      // إضافة للسلة عبر API
       const cartData = {
-        service_id: service.id
+        carts: [{ service_id: service.id }]
       };
 
       const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
@@ -60,14 +127,23 @@ function ServicesSection() {
 
       const result = await response.json();
       console.log('🛒 Add to cart response:', result);
-      console.log('🛒 Response status:', result.status, 'Type:', typeof result.status);
 
       if (response.ok && (result.status === true || result.status === 'success')) {
-        console.log('✅ Calling showSuccess');
-        showSuccess('تم إضافة الخدمة للسلة بنجاح');
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: serviceImage,
+            title: service.title_ar || service.title || service.service,
+            price: service.price,
+            id: service.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/dashboard?filter=NewBooking')
+        });
+        
         window.dispatchEvent(new CustomEvent('cartUpdated'));
       } else {
-        console.log('❌ Calling showError');
         showError(result.message || 'حدث خطأ أثناء إضافة الخدمة للسلة');
       }
     } catch (error) {
@@ -77,6 +153,10 @@ function ServicesSection() {
       setAddingToCart(prev => ({ ...prev, [service.id]: false }));
     }
   };
+
+  useEffect(() => {
+    document.title = 'خدماتنا الطبية - مجمع غيم الطبي';
+  }, []);
 
   // جلب البيانات من API
   useEffect(() => {
@@ -164,7 +244,10 @@ function ServicesSection() {
               filters.map((filter) => (
                 <button
                   key={filter}
-                  onClick={() => setActiveFilter(filter)}
+                  onClick={() => {
+                    setActiveFilter(filter);
+                    setCurrentPage(1); // Reset pagination when filter changes
+                  }}
                   className={`px-4 py-2 rounded-lg text-sm transition-all duration-300 ${
                     activeFilter === filter
                       ? 'bg-[#9bc115] text-white shadow-md'
@@ -200,12 +283,20 @@ function ServicesSection() {
         )}
 
         {/* الكروت */}
-        {!loading && filteredServices.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8 place-items-center">
-            {filteredServices.map((service) => (
+        {!loading && filteredServices.length > 0 && (() => {
+          // حساب pagination
+          const totalPages = Math.ceil(filteredServices.length / itemsPerPage);
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          const currentServices = filteredServices.slice(startIndex, endIndex);
+          
+          return (
+            <>
+              <div ref={servicesGridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8 place-items-center">
+                {currentServices.map((service) => (
               <div
                 key={service.id}
-                onClick={() => handleServiceClick(service.clinics_id, service.id)}
+                onClick={() => handleServiceClick(service)}
                 className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group cursor-pointer"
                 style={{
                   height: '480px',
@@ -216,6 +307,9 @@ function ServicesSection() {
                 {/* الصورة */}
                 <div className="relative w-full h-80 overflow-hidden bg-gray-100 rounded-t-xl">
                   <img
+                    ref={(el) => {
+                      if (el) el.dataset.serviceId = service.id;
+                    }}
                     src={service.images && service.images.length > 0 ? service.images[0].image : '/1.png'}
                     alt={service.title_ar || service.title}
                     className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
@@ -226,7 +320,10 @@ function ServicesSection() {
 
                   {/* أيقونة السلة */}
                   <button
-                    onClick={(e) => handleAddToCart(e, service)}
+                    onClick={(e) => {
+                      const img = e.currentTarget.parentElement.querySelector('img');
+                      handleAddToCart(e, service, img);
+                    }}
                     disabled={addingToCart[service.id]}
                     className="absolute top-3 left-3 w-10 h-10 bg-white hover:bg-blue-50 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed z-20"
                     title="أضف للسلة"
@@ -248,7 +345,8 @@ function ServicesSection() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/service/${service.clinics_id}/${service.id}`);
+                        const slug = createUniqueSlug(service.title_ar || service.title, service.id);
+                        navigate(`/service/${slug}`);
                       }}
                       className="py-2 px-6 bg-gradient-to-r from-[#9bc115] to-[#7a9c0f] text-white rounded-lg font-bold text-sm hover:from-[#7a9c0f] hover:to-[#5d7a0b] shadow-lg hover:shadow-xl cursor-pointer transition-all duration-300"
                       style={{ fontFamily: 'Almarai' }}
@@ -318,7 +416,19 @@ function ServicesSection() {
               </div>
             ))}
           </div>
-        )}
+          
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            totalItems={filteredServices.length}
+            scrollToRef={servicesGridRef}
+          />
+        </>
+          );
+        })()}
       </div>
 
       {/* Footer */}

@@ -16,7 +16,7 @@ function TestimonialsSection() {
           const formattedReviews = response.data.data.map(review => ({
             id: review.id,
             name: review.user?.fullname || 'مستخدم',
-            image: review.user?.profile_image || '/Ellipse 1.png',
+            image: review.image_path || '/Ellipse 1.png', // صورة الـ review بدل صورة المستخدم
             rating: Math.round(review.rating), // تقريب التقييم لأقرب رقم صحيح
             text: review.comment || '',
             clinic: review.clinic?.clinic_name || ''

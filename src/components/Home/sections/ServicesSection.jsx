@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getClinicsData } from '../../../API/apiService';
+import { createUniqueSlug } from '../../../utils/slugUtils';
 
 function ServicesSection() {
   const navigate = useNavigate();
@@ -93,8 +94,9 @@ function ServicesSection() {
   }, [loading, clinics]);
 
   // دالة للتوجيه إلى صفحة العروض
-  const handleClinicClick = (clinicId) => {
-    navigate('/Category', { state: { clinicId } });
+  const handleClinicClick = (clinic) => {
+    const slug = createUniqueSlug(clinic.title, clinic.id);
+    navigate(`/clinic/${slug}`);
   };
 
   // جلب بيانات العيادات من API
@@ -213,7 +215,7 @@ function ServicesSection() {
             clinics.map((clinic) => (
               <div
                 key={clinic.id}
-                onClick={() => handleClinicClick(clinic.id)}
+                onClick={() => handleClinicClick(clinic)}
                 className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex-shrink-0 w-[300px] sm:w-[340px] md:w-full h-[520px]"
               >
                 {/* الصورة */}

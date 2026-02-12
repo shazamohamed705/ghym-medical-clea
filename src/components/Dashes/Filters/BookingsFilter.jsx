@@ -186,6 +186,12 @@ const BookingsFilter = () => {
 
   // Get doctor name from staff data
   const getDoctorName = (booking) => {
+    // Try to get staff name from booking.staff first (comes directly from API)
+    if (booking.staff && booking.staff.name) {
+      return booking.staff.name;
+    }
+
+    // Fallback to clinic staff data
     const clinicInfo = staffData[booking.clinics_id];
     if (!clinicInfo) return 'الطبيب';
 
@@ -309,6 +315,10 @@ const BookingsFilter = () => {
                     <div className="service-details">
                       <h4 className="clinic-name">{getClinicName(booking.clinics_id)}</h4>
                       <p className="service-name">{getServiceName(booking)}</p>
+                      <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                        <FaUser className="w-3 h-3" />
+                        <span>{getDoctorName(booking)}</span>
+                      </p>
                       
                       {/* الأزرار تحت اسم الخدمة */}
                       <div className="booking-actions mt-2">

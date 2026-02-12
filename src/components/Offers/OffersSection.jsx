@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaHospital } from 'react-icons/fa';
+import { createUniqueSlug } from '../../utils/slugUtils';
+import { addToLocalCart } from '../../utils/cartUtils';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import BannerCarousel from '../Banner/BannerCarousel';
 import Footer from '../footer/footer';
+import Pagination from '../Pagination/Pagination';
 import { getClinicsData, getOffersDataDirect } from '../../API/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast/ToastManager';
@@ -17,6 +20,15 @@ function OffersSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [addingToCart, setAddingToCart] = useState({});
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
+  const offersGridRef = useRef(null);
+
+  useEffect(() => {
+    document.title = 'عروضنا - مجمع غيم الطبي';
+  }, []);
 
   // وظيفة للحصول على أفضل صورة متاحة للخدمة
   const getServiceImage = useCallback((offer) => {
@@ -98,28 +110,87 @@ function OffersSection() {
   const shouldShowOffers = useMemo(() => !loading && !error && offersCount > 0, [loading, error, offersCount]);
 
   // دالة لإضافة خدمة للسلة
-  const handleAddToCart = async (e, offer) => {
+  const handleAddToCart = async (e, offer, imageElement) => {
     e.stopPropagation();
-    
-    if (!isAuthenticated()) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     const token = localStorage.getItem('authToken');
-    if (!token) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     setAddingToCart(prev => ({ ...prev, [offer.id]: true }));
 
     try {
-      // إضافة للسلة بدون staff_id (اختياري)
+      // Create flying image animation
+      if (imageElement) {
+        const imageRect = imageElement.getBoundingClientRect();
+        
+        // Find cart icon in navbar
+        const cartIcon = document.querySelector('[data-cart-icon]');
+        const cartRect = cartIcon ? cartIcon.getBoundingClientRect() : { top: 0, left: window.innerWidth };
+
+        // Create flying image clone
+        const flyingImage = imageElement.cloneNode(true);
+        flyingImage.style.position = 'fixed';
+        flyingImage.style.top = `${imageRect.top}px`;
+        flyingImage.style.left = `${imageRect.left}px`;
+        flyingImage.style.width = `${imageRect.width}px`;
+        flyingImage.style.height = `${imageRect.height}px`;
+        flyingImage.style.zIndex = '10000';
+        flyingImage.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        flyingImage.style.pointerEvents = 'none';
+        flyingImage.style.borderRadius = '1rem';
+        
+        document.body.appendChild(flyingImage);
+
+        // Trigger animation
+        setTimeout(() => {
+          flyingImage.style.top = `${cartRect.top}px`;
+          flyingImage.style.left = `${cartRect.left}px`;
+          flyingImage.style.width = '50px';
+          flyingImage.style.height = '50px';
+          flyingImage.style.opacity = '0.3';
+        }, 50);
+
+        // Remove flying image after animation
+        setTimeout(() => {
+          document.body.removeChild(flyingImage);
+        }, 900);
+      }
+
+      // Get offer image and price
+      const offerImage = getServiceImage(offer) || '/1.png';
+      const offerPrice = offer.newPrice || offer.oldPrice || offer.price || 0;
+
+      // إذا لم يكن هناك token، احفظ في localStorage
+      if (!token) {
+        addToLocalCart({
+          service_id: offer.id,
+          title_ar: offer.service,
+          title: offer.service,
+          price: offerPrice,
+          image: offerImage,
+          serviceImages: offer.serviceImages,
+          clinicName: offer.clinicName
+        });
+
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: offerImage,
+            title: offer.service,
+            price: offerPrice,
+            id: offer.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/login')
+        });
+
+        setAddingToCart(prev => ({ ...prev, [offer.id]: false }));
+        return;
+      }
+
+      // إضافة للسلة عبر API
       const cartData = {
-        service_id: offer.id
+        carts: [{ service_id: offer.id }]
       };
 
       const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
@@ -133,14 +204,23 @@ function OffersSection() {
 
       const result = await response.json();
       console.log('🛒 Add to cart response:', result);
-      console.log('🛒 Response status:', result.status, 'Type:', typeof result.status);
 
       if (response.ok && (result.status === true || result.status === 'success')) {
-        console.log('✅ Calling showSuccess');
-        showSuccess('تم إضافة الخدمة للسلة بنجاح');
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: offerImage,
+            title: offer.service,
+            price: offerPrice,
+            id: offer.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/dashboard?filter=NewBooking')
+        });
+        
         window.dispatchEvent(new CustomEvent('cartUpdated'));
       } else {
-        console.log('❌ Calling showError');
         showError(result.message || 'حدث خطأ أثناء إضافة الخدمة للسلة');
       }
     } catch (error) {
@@ -255,9 +335,17 @@ function OffersSection() {
         )}
 
         {/* الكروت */}
-        {shouldShowOffers && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-            {offers.map((offer) => (
+        {shouldShowOffers && (() => {
+          // حساب pagination
+          const totalPages = Math.ceil(offers.length / itemsPerPage);
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          const currentOffers = offers.slice(startIndex, endIndex);
+          
+          return (
+            <>
+              <div ref={offersGridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+                {currentOffers.map((offer) => (
               <div
                 key={offer.id}
                 className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group w-full"
@@ -274,6 +362,9 @@ function OffersSection() {
                     if (displayImage) {
                       return (
                         <img
+                          ref={(el) => {
+                            if (el) el.dataset.offerId = offer.id;
+                          }}
                           src={displayImage}
                           alt={offer.service}
                           className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
@@ -300,7 +391,10 @@ function OffersSection() {
 
                   {/* أيقونة السلة */}
                   <button
-                    onClick={(e) => handleAddToCart(e, offer)}
+                    onClick={(e) => {
+                      const img = e.currentTarget.parentElement.querySelector('img');
+                      handleAddToCart(e, offer, img);
+                    }}
                     disabled={addingToCart[offer.id]}
                     className="absolute top-3 left-3 w-10 h-10 bg-white hover:bg-blue-50 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed z-20"
                     title="أضف للسلة"
@@ -320,7 +414,10 @@ function OffersSection() {
                   {/* زر التفاصيل الثابت */}
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
                     <button
-                      onClick={() => navigate(`/service/${offer.clinicId}/${offer.id}`)}
+                      onClick={() => {
+                        const slug = createUniqueSlug(offer.service, offer.id);
+                        navigate(`/service/${slug}`);
+                      }}
                       className="py-1.5 px-3 sm:py-2 sm:px-4 md:py-2 md:px-6 bg-gradient-to-r from-[#0171bd] to-[#015a99] text-white rounded-lg font-bold text-xs sm:text-sm hover:from-[#015a99] hover:to-[#013d73] shadow-lg hover:shadow-xl cursor-pointer transition-all duration-300"
                       style={{ fontFamily: 'Almarai' }}
                     >
@@ -400,7 +497,19 @@ function OffersSection() {
               </div>
             ))}
           </div>
-        )}
+          
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            totalItems={offers.length}
+            scrollToRef={offersGridRef}
+          />
+        </>
+          );
+        })()}
       </div>
 
       {/* Footer */}

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { FaHospital } from 'react-icons/fa';
+import { createUniqueSlug } from '../../utils/slugUtils';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import BannerCarousel from '../Banner/BannerCarousel';
 import Footer from '../footer/footer';
+import Pagination from '../Pagination/Pagination';
 
 function SearchResults() {
   const navigate = useNavigate();
@@ -12,8 +14,17 @@ function SearchResults() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
+  const servicesGridRef = useRef(null);
 
   const searchQuery = searchParams.get('query');
+
+  useEffect(() => {
+    document.title = searchQuery ? `نتائج البحث: ${searchQuery} - مجمع غيم الطبي` : 'نتائج البحث - مجمع غيم الطبي';
+  }, [searchQuery]);
 
   // وظيفة تمييز الكلمات المطابقة في النص
   const highlightSearchTerm = (text, searchTerm) => {
@@ -23,8 +34,9 @@ function SearchResults() {
     return text.replace(regex, '<mark style="background-color: #fef3c7; padding: 1px 2px; border-radius: 2px;">$1</mark>');
   };
 
-  const handleServiceClick = (serviceId, clinicId) => {
-    navigate(`/service/${clinicId}/${serviceId}`);
+  const handleServiceClick = (service) => {
+    const slug = createUniqueSlug(service.service, service.id);
+    navigate(`/service/${slug}`);
   };
 
   useEffect(() => {
@@ -244,7 +256,7 @@ function SearchResults() {
                   width: '320px',
                   maxWidth: '100%'
                 }}
-                onClick={() => handleServiceClick(service.id, service.clinicId)}
+                onClick={() => handleServiceClick(service)}
               >
                 {/* الصورة */}
                 <div className="relative w-full h-80 overflow-hidden bg-gray-100 rounded-t-xl">
@@ -275,7 +287,7 @@ function SearchResults() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleServiceClick(service.id, service.clinicId);
+                        handleServiceClick(service);
                       }}
                       className="py-2 px-6 bg-gradient-to-r from-[#0171bd] to-[#015a99] text-white rounded-lg font-bold text-sm hover:from-[#015a99] hover:to-[#013d73] shadow-lg hover:shadow-xl cursor-pointer transition-all duration-300"
                       style={{ fontFamily: 'Almarai' }}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { FaCheckCircle } from 'react-icons/fa';
 import './contact.css';
 import Navbar from '../Navbar/Navbar';
@@ -161,6 +161,10 @@ const Contact = () => {
     const timer = setTimeout(() => setIsSubmitted(false), 5000);
     return () => clearTimeout(timer);
   }, [isSubmitted]);
+
+  useEffect(() => {
+    document.title = 'تواصل معنا - مجمع غيم الطبي';
+  }, []);
 
   return (
     <div className="min-h-screen bg-white">

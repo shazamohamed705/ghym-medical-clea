@@ -254,30 +254,32 @@ function Footer() {
               {contactData && contactData.working_times && (
                 <div className="flex items-center gap-2 text-white" style={{ fontFamily: 'Almarai', fontWeight: 400 }}>
                   <FaClock className="text-green-400 text-base flex-shrink-0" />
-                  <span className="text-white" style={{
-                    fontFamily: 'Almarai',
-                    fontWeight: 700,
-                    fontStyle: 'Bold',
-                    fontSize: '12px',
-                    leadingTrim: 'NONE',
-                    lineHeight: '26px',
-                    letterSpacing: '0%',
-                    textAlign: 'right',
-                    verticalAlign: 'middle',
-                    whiteSpace: 'nowrap'
-                  }}>ساعات العمل:</span>
-                  <span className="text-white" style={{
-                    fontFamily: 'Almarai',
-                    fontWeight: 400,
-                    fontStyle: 'Regular',
-                    fontSize: '10px',
-                    lineHeight: '26px',
-                    letterSpacing: '0%',
-                    textAlign: 'right',
-                    verticalAlign: 'middle'
-                  }}>
-                    {formatWorkingTimes(contactData.working_times)}
-                  </span>
+                  <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
+                    <span
+                      className="text-white flex-shrink-0"
+                      style={{
+                        fontFamily: 'Almarai',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        lineHeight: '26px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      ساعات العمل:
+                    </span>
+                    <span
+                      className="text-white truncate min-w-0"
+                      style={{
+                        fontFamily: 'Almarai',
+                        fontWeight: 400,
+                        fontSize: '11px',
+                        lineHeight: '26px',
+                      }}
+                      title={formatWorkingTimes(contactData.working_times)}
+                    >
+                      {formatWorkingTimes(contactData.working_times)}
+                    </span>
+                  </div>
                 </div>
               )}
               {loading && (

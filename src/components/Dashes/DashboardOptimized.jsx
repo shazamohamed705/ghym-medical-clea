@@ -35,7 +35,7 @@ const DashboardOptimized = () => {
   });
   const [uploadedImage, setUploadedImage] = useState(null);
   const [userData, setUserData] = useState(null);
-  const [selectedClinic, setSelectedClinic] = useState(1);
+  const [selectedClinic, setSelectedClinic] = useState(null);
   const [currentBookingStep, setCurrentBookingStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -215,8 +215,8 @@ const DashboardOptimized = () => {
 
   // Handle new booking
   const handleNewBooking = useCallback(() => {
-    setActiveFilter('حجز جديد');
-  }, []);
+    navigate('/booking', { state: { fromDashboard: true } });
+  }, [navigate]);
 
   // Handle filter selection with useCallback for performance optimization
   const handleFilterSelect = useCallback((item) => {

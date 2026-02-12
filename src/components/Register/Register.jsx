@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaCheck, FaTimes } from 'react-icons/fa';
 import { resendOTP } from '../../API/apiService';
 import { useAuth } from '../../contexts/AuthContext';
+import Navbar from '../Navbar/Navbar';
+import MainNavbar from '../Navbar/MainNavbar';
+import Footer from '../footer/footer';
 import './GhymAuthStyles.css';
 
 const GhymAuthRegister = () => {
@@ -25,6 +28,10 @@ const GhymAuthRegister = () => {
   const [logoLoading, setLogoLoading] = useState(true);
   const navigate = useNavigate();
   const { login } = useAuth(); // Get login function from AuthContext
+
+  useEffect(() => {
+    document.title = 'إنشاء حساب جديد - مجمع غيم الطبي';
+  }, []);
 
   // جلب لوجو الموقع
   useEffect(() => {
@@ -448,39 +455,11 @@ const GhymAuthRegister = () => {
   );
 
   return (
-    <div className="ghym-auth-container">
-      {/* Header Section */}
-      <header className="ghym-auth-header">
-        <div className="ghym-auth-header-content">
-          {/* Logo Section */}
-          <div className="ghym-auth-logo-section">
-            {logoLoading ? (
-              <div className="ghym-auth-logo-loading">
-                <div className="spinner"></div>
-              </div>
-            ) : (
-              <Link to="/">
-                <img 
-                  src={websiteLogo || "/logoo.png"} 
-                  alt="مجمع غيم الطبي" 
-                  className="ghym-auth-logo-img"
-                  style={{ cursor: 'pointer' }}
-                />
-              </Link>
-            )}
-          </div>
-
-          {/* Back Button */}
-          <button 
-            className="ghym-auth-back-btn"
-            onClick={() => navigate(-1)}
-            aria-label="العودة"
-          >
-            <FaArrowLeft className="ghym-auth-back-icon" />
-          </button>
-        </div>
-      </header>
-
+    <>
+      <Navbar />
+      <MainNavbar />
+      
+      <div className="ghym-auth-container">
       {/* Main Content */}
       <main className="ghym-auth-main">
         <div className="ghym-auth-card">
@@ -559,6 +538,9 @@ const GhymAuthRegister = () => {
         </div>
       </main>
     </div>
+    
+    <Footer />
+    </>
   );
 };
 

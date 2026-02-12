@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createUniqueSlug } from '../../../utils/slugUtils';
 import { FaTooth, FaMoneyBillWave, FaClock, FaMapPin, FaStar, FaPlus, FaStethoscope, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 
 // Services filter component - Available services list
@@ -59,8 +60,9 @@ const ServicesFilter = () => {
 
   // Handle service booking - navigate to service details
   const handleServiceBooking = (service) => {
-    console.log('🔄 Navigating to service details:', service.id, 'Clinic ID:', service.clinics_id);
-    navigate(`/service/${service.clinics_id}/${service.id}`);
+    console.log('🔄 Navigating to service details:', service.id);
+    const slug = createUniqueSlug(service.title_ar || service.title, service.id);
+    navigate(`/service/${slug}`);
   };
 
   // Filter services based on search

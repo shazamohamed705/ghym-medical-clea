@@ -74,6 +74,10 @@ const NewBookingFilter = ({
   const [newCity, setNewCity] = useState('');
   const [addingAddress, setAddingAddress] = useState(false);
   
+  // User info state
+  const [userName, setUserName] = useState('');
+  const [userPhone, setUserPhone] = useState('');
+  
   // Pagination state for services
   const [currentServicePage, setCurrentServicePage] = useState(1);
   const servicesPerPage = 10;
@@ -233,6 +237,16 @@ const NewBookingFilter = ({
       }
 
       // Validate required fields
+      if (!userName.trim()) {
+        showError('يرجى إدخال الاسم');
+        return;
+      }
+
+      if (!userPhone.trim()) {
+        showError('يرجى إدخال رقم الهاتف');
+        return;
+      }
+
       if (!selectedClinicId) {
         showError('يرجى اختيار عيادة صحيحة');
         return;
@@ -281,6 +295,15 @@ const NewBookingFilter = ({
           clinics_id: selectedClinicId,
           service_id: serviceId
         };
+
+        // إضافة الاسم ورقم الهاتف
+        if (userName.trim()) {
+          bookingData.full_name = userName.trim();
+        }
+        
+        if (userPhone.trim()) {
+          bookingData.phone = userPhone.trim();
+        }
 
         // إضافة staff_id فقط إذا تم اختيار دكتور
         if (selectedDoctorId) {
@@ -1095,69 +1118,124 @@ const NewBookingFilter = ({
             حجز موعد جديد
           </h2>
         </div>
-
-        {/* Simple Step Icons Only */}
-        <div className="simple-progress-section">
-          <div className="simple-step-icons">
-            <div className={`simple-step-icon ${currentBookingStep > 1 ? 'completed' : currentBookingStep === 1 ? 'active' : 'inactive'}`}>
-              <div className="simple-step-icon-circle">
-                {currentBookingStep > 1 ? (
-                  <FaCheck className="simple-step-icon-svg" />
-                ) : (
-                  <FaStethoscope className="simple-step-icon-svg" />
-                )}
-              </div>
-              <span className="simple-step-name">العيادة</span>
-            </div>
-            <div className={`simple-step-icon ${currentBookingStep > 2 ? 'completed' : currentBookingStep === 2 ? 'active' : 'inactive'}`}>
-              <div className="simple-step-icon-circle">
-                {currentBookingStep > 2 ? (
-                  <FaCheck className="simple-step-icon-svg" />
-                ) : (
-                  <FaHeadphones className="simple-step-icon-svg" />
-                )}
-              </div>
-              <span className="simple-step-name">الخدمات</span>
-            </div>
-            <div className={`simple-step-icon ${currentBookingStep > 3 ? 'completed' : currentBookingStep === 3 ? 'active' : 'inactive'}`}>
-              <div className="simple-step-icon-circle">
-                {currentBookingStep > 3 ? (
-                  <FaCheck className="simple-step-icon-svg" />
-                ) : (
-                  <FaUser className="simple-step-icon-svg" />
-                )}
-              </div>
-              <span className="simple-step-name">الطبيب</span>
-            </div>
-            <div className={`simple-step-icon ${currentBookingStep > 4 ? 'completed' : currentBookingStep === 4 ? 'active' : 'inactive'}`}>
-              <div className="simple-step-icon-circle">
-                {currentBookingStep > 4 ? (
-                  <FaCheck className="simple-step-icon-svg" />
-                ) : (
-                  <FaMapMarkerAlt className="simple-step-icon-svg" />
-                )}
-              </div>
-              <span className="simple-step-name">العنوان</span>
-            </div>
-            <div className={`simple-step-icon ${currentBookingStep > 5 ? 'completed' : currentBookingStep === 5 ? 'active' : 'inactive'}`}>
-              <div className="simple-step-icon-circle">
-                {currentBookingStep > 5 ? (
-                  <FaCheck className="simple-step-icon-svg" />
-                ) : (
-                  <FaCalendarAlt className="simple-step-icon-svg" />
-                )}
-              </div>
-              <span className="simple-step-name">الموعد</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Main Content */}
       <div className="booking-content">
-        {/* Step 1: Choose Clinic */}
-        {currentBookingStep === 1 && !bookingSuccess && (
+        {/* Booking Success Card */}
+        {bookingSuccess && (
+          <div className="booking-success-card-inline">
+            <div className="booking-success-icon">
+              <FaCheck />
+            </div>
+            <h2 className="booking-success-title">تم إنشاء الحجوزات بنجاح!</h2>
+            <p className="booking-success-subtitle">
+              مع {selectedDoctorName}
+            </p>
+            <div className="booking-success-id">
+              <div className="booking-id-icon">
+                <FaCheck />
+              </div>
+              <span className="booking-id-text">
+                {selectedServiceIds.length > 1 
+                  ? `تم إنشاء ${selectedServiceIds.length} حجز` 
+                  : `رقم الحجز: #${bookingId}`
+                }
+              </span>
+            </div>
+            <button 
+              className="booking-success-btn"
+              onClick={() => {
+                setBookingSuccess(false);
+                setBookingId(null);
+                setCompletionOtp('');
+                setSelectedDoctorName('');
+                setActiveFilter('لوحة التحكم الرئيسية');
+              }}
+            >
+              العودة للرئيسية
+            </button>
+          </div>
+        )}
+
+        {/* All sections visible when not showing success */}
+        {!bookingSuccess && (
           <>
+        {/* Step 0: User Information */}
+        <div style={{ marginBottom: '32px' }}>
+            <h3 className="content-title">معلومات الحجز</h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)', 
+              gap: '16px',
+              marginTop: '16px'
+            }}>
+              {/* Name Field */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '500', 
+                  color: '#374151' 
+                }}>
+                  الاسم
+                </label>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="أدخل الاسم"
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#0ea5e9'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                />
+              </div>
+
+              {/* Phone Field */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '500', 
+                  color: '#374151' 
+                }}>
+                  رقم الهاتف
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={userPhone}
+                  onChange={(e) => {
+                    // Allow only numbers
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setUserPhone(value);
+                  }}
+                  placeholder="أدخل رقم الهاتف"
+                  dir="rtl"
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    textAlign: 'right',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#0ea5e9'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                />
+              </div>
+            </div>
+        </div>
+
+        {/* Step 1: Choose Clinic */}
+        <div style={{ marginBottom: '32px' }}>
             <h3 className="content-title">اختر العيادة</h3>
             <div 
               className="clinics-list clinics-grid"
@@ -1349,48 +1427,237 @@ const NewBookingFilter = ({
                 </button>
               </div>
             )}
-          </>
-        )}
-
-        {/* Booking Success Card */}
-        {bookingSuccess && (
-          <div className="booking-success-card-inline">
-            <div className="booking-success-icon">
-              <FaCheck />
-            </div>
-            <h2 className="booking-success-title">تم إنشاء الحجوزات بنجاح!</h2>
-            <p className="booking-success-subtitle">
-              مع {selectedDoctorName}
-            </p>
-            <div className="booking-success-id">
-              <div className="booking-id-icon">
-                <FaCheck />
-              </div>
-              <span className="booking-id-text">
-                {selectedServiceIds.length > 1 
-                  ? `تم إنشاء ${selectedServiceIds.length} حجز` 
-                  : `رقم الحجز: #${bookingId}`
-                }
-              </span>
-            </div>
-            <button 
-              className="booking-success-btn"
-              onClick={() => {
-                setBookingSuccess(false);
-                setBookingId(null);
-                setCompletionOtp('');
-                setSelectedDoctorName('');
-                setActiveFilter('لوحة التحكم الرئيسية');
-              }}
-            >
-              العودة للرئيسية
-            </button>
           </div>
+
+        {/* Step 2: Choose Service - Only show if clinic is selected */}
+        {selectedClinic && (
+        <div style={{ marginBottom: '32px' }}>
+            <div className="ghym-srv-scope-1">
+              <h3 className="content-title ghym-srv-title">
+                اختر الخدمات 
+                {(() => {
+                  console.log('📊 Rendering service counter. selectedServiceIds:', selectedServiceIds);
+                  console.log('📊 selectedServiceIds.length:', selectedServiceIds.length);
+                  return selectedServiceIds.length > 0 && (
+                    <span style={{ 
+                      color: '#0ea5e9', 
+                      fontSize: '14px', 
+                      fontWeight: 'normal',
+                      marginRight: '8px'
+                    }}>
+                      ({selectedServiceIds.length} محدد)
+                    </span>
+                  );
+                })()}
+              </h3>
+              <p style={{ 
+                textAlign: 'center', 
+                color: '#6b7280', 
+                fontSize: '14px', 
+                marginBottom: '16px',
+                background: '#f8fafc',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                يمكنك اختيار أكثر من خدمة واحدة
+              </p>
+            <div className="clinics-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', padding: '16px 0' }}>
+                {paginatedServices.map((service) => {
+                  // Get the original service data for booking_cycle check
+                  const originalService = services.find(s => s.id === service.id) || service;
+                  
+                  return (
+                  <div 
+                    key={service.id}
+                    className={`clinic-card ghym-srv-card ${selectedServiceIds.includes(service.id) ? 'selected' : ''}`}
+                    onClick={(e) => {
+                      // Only handle click if not clicking on checkbox
+                      if (e.target.type !== 'checkbox') {
+                        handleServiceSelection(originalService);
+                      }
+                    }}
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      minHeight: '100px'
+                    }}
+                  >
+                    <div className="clinic-info" style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                      <div style={{ 
+                        width: '48px', 
+                        height: '48px', 
+                        borderRadius: '50%', 
+                        background: '#f0f9ff', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        color: '#0ea5e9',
+                        fontSize: '18px'
+                      }}>
+                        <FaStethoscope />
+                      </div>
+                      <div className="clinic-details" style={{ flex: 1 }}>
+                        <h4 className="clinic-name" style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
+                          {service.name}
+                        </h4>
+                        <p style={{ margin: '0', fontSize: '14px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <FaClock />
+                            <span>{service.duration}</span>
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <FaMoneyBillWave />
+                            <span>{service.price}</span>
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="clinic-checkbox" style={{ marginLeft: '16px' }}>
+                      <input 
+                        type="checkbox" 
+                        name="service" 
+                        checked={selectedServiceIds.includes(service.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleServiceSelection(originalService);
+                        }}
+                        style={{ 
+                          width: '20px', 
+                          height: '20px',
+                          accentColor: '#3B82F6',
+                          cursor: 'pointer'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '24px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  {/* Previous Button */}
+                  <button
+                    onClick={() => setCurrentServicePage(prev => Math.max(1, prev - 1))}
+                    disabled={currentServicePage === 1}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      background: currentServicePage === 1 ? '#f3f4f6' : 'white',
+                      color: currentServicePage === 1 ? '#9ca3af' : '#374151',
+                      cursor: currentServicePage === 1 ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <FaArrowRight style={{ fontSize: '12px' }} />
+                    السابق
+                  </button>
+
+                  {/* Page Numbers */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '4px',
+                    alignItems: 'center'
+                  }}>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage = 
+                        pageNum === 1 || 
+                        pageNum === totalPages || 
+                        Math.abs(pageNum - currentServicePage) <= 1;
+                      
+                      // Show ellipsis
+                      const showEllipsisBefore = pageNum === currentServicePage - 2 && currentServicePage > 3;
+                      const showEllipsisAfter = pageNum === currentServicePage + 2 && currentServicePage < totalPages - 2;
+
+                      if (showEllipsisBefore || showEllipsisAfter) {
+                        return (
+                          <span key={pageNum} style={{ padding: '0 4px', color: '#9ca3af' }}>
+                            ...
+                          </span>
+                        );
+                      }
+
+                      if (!showPage) return null;
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentServicePage(pageNum)}
+                          style={{
+                            minWidth: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            border: pageNum === currentServicePage ? 'none' : '1px solid #d1d5db',
+                            background: pageNum === currentServicePage ? '#0ea5e9' : 'white',
+                            color: pageNum === currentServicePage ? 'white' : '#374151',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: pageNum === currentServicePage ? '600' : '500',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Button */}
+                  <button
+                    onClick={() => setCurrentServicePage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentServicePage === totalPages}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      background: currentServicePage === totalPages ? '#f3f4f6' : 'white',
+                      color: currentServicePage === totalPages ? '#9ca3af' : '#374151',
+                      cursor: currentServicePage === totalPages ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    التالي
+                    <FaArrowLeft style={{ fontSize: '12px' }} />
+                  </button>
+                </div>
+              )}
+            </div>
+        </div>
         )}
 
-        {/* Step 3: Choose Doctor */}
-        {currentBookingStep === 3 && (
-          <>
+        {/* Step 3: Choose Doctor - Only show if clinic and service are selected */}
+        {selectedClinic && selectedServiceIds.length > 0 && (
+        <div style={{ marginBottom: '32px' }}>
             <h3 className="content-title">
               اختر الطبيب (اختياري)
             </h3>
@@ -1590,258 +1857,12 @@ const NewBookingFilter = ({
                 </p>
               </div>
             )}
-          </>
+        </div>
         )}
 
-        {/* Step 2: Choose Service */}
-        {currentBookingStep === 2 && (
-          <>
-            <div className="ghym-srv-scope-1">
-              <h3 className="content-title ghym-srv-title">
-                اختر الخدمات 
-                {(() => {
-                  console.log('📊 Rendering service counter. selectedServiceIds:', selectedServiceIds);
-                  console.log('📊 selectedServiceIds.length:', selectedServiceIds.length);
-                  return selectedServiceIds.length > 0 && (
-                    <span style={{ 
-                      color: '#0ea5e9', 
-                      fontSize: '14px', 
-                      fontWeight: 'normal',
-                      marginRight: '8px'
-                    }}>
-                      ({selectedServiceIds.length} محدد)
-                    </span>
-                  );
-                })()}
-              </h3>
-              <p style={{ 
-                textAlign: 'center', 
-                color: '#6b7280', 
-                fontSize: '14px', 
-                marginBottom: '16px',
-                background: '#f8fafc',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0'
-              }}>
-                يمكنك اختيار أكثر من خدمة واحدة
-              </p>
-              
-              {/* Message when no services available for selected doctor */}
-              {selectedDoctorId && bookingServicesFromApi.length === 0 && (
-                <div style={{
-                  background: '#fef2f2',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  marginBottom: '16px',
-                  textAlign: 'center'
-                }}>
-                  <p style={{ 
-                    margin: '0', 
-                    fontSize: '14px', 
-                    color: '#dc2626' 
-                  }}>
-                    لا توجد خدمات متاحة للطبيب المختار. يرجى اختيار طبيب آخر.
-                  </p>
-                </div>
-              )}
-              
-              <div className="clinics-list ghym-srv-services-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', padding: '16px 0' }}>
-                {paginatedServices.map((service) => {
-                  // Get the original service data for booking_cycle check
-                  const originalService = services.find(s => s.id === service.id) || service;
-                  
-                  return (
-                  <div 
-                    key={service.id}
-                    className={`clinic-card ghym-srv-card ${selectedServiceIds.includes(service.id) ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      // Only handle click if not clicking on checkbox
-                      if (e.target.type !== 'checkbox') {
-                        handleServiceSelection(originalService);
-                      }
-                    }}
-                    style={{
-                      background: 'white',
-                      borderRadius: '12px',
-                      padding: '20px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      minHeight: '100px'
-                    }}
-                  >
-                    <div className="clinic-info" style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-                      <div style={{ 
-                        width: '48px', 
-                        height: '48px', 
-                        borderRadius: '50%', 
-                        background: '#f0f9ff', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        color: '#0ea5e9',
-                        fontSize: '18px'
-                      }}>
-                        <FaStethoscope />
-                      </div>
-                      <div className="clinic-details" style={{ flex: 1 }}>
-                        <h4 className="clinic-name" style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
-                          {service.name}
-                        </h4>
-                        <p style={{ margin: '0', fontSize: '14px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <FaClock />
-                            <span>{service.duration}</span>
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <FaMoneyBillWave />
-                            <span>{service.price}</span>
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="clinic-checkbox" style={{ marginLeft: '16px' }}>
-                      <input 
-                        type="checkbox" 
-                        name="service" 
-                        checked={selectedServiceIds.includes(service.id)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleServiceSelection(originalService);
-                        }}
-                        style={{ 
-                          width: '20px', 
-                          height: '20px',
-                          accentColor: '#3B82F6',
-                          cursor: 'pointer'
-                        }}
-                      />
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-              
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginTop: '24px',
-                  paddingTop: '16px',
-                  borderTop: '1px solid #e5e7eb'
-                }}>
-                  {/* Previous Button */}
-                  <button
-                    onClick={() => setCurrentServicePage(prev => Math.max(1, prev - 1))}
-                    disabled={currentServicePage === 1}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      background: currentServicePage === 1 ? '#f3f4f6' : 'white',
-                      color: currentServicePage === 1 ? '#9ca3af' : '#374151',
-                      cursor: currentServicePage === 1 ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <FaArrowRight style={{ fontSize: '12px' }} />
-                    السابق
-                  </button>
-
-                  {/* Page Numbers */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '4px',
-                    alignItems: 'center'
-                  }}>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                      // Show first page, last page, current page, and pages around current
-                      const showPage = 
-                        pageNum === 1 || 
-                        pageNum === totalPages || 
-                        Math.abs(pageNum - currentServicePage) <= 1;
-                      
-                      // Show ellipsis
-                      const showEllipsisBefore = pageNum === currentServicePage - 2 && currentServicePage > 3;
-                      const showEllipsisAfter = pageNum === currentServicePage + 2 && currentServicePage < totalPages - 2;
-
-                      if (showEllipsisBefore || showEllipsisAfter) {
-                        return (
-                          <span key={pageNum} style={{ padding: '0 4px', color: '#9ca3af' }}>
-                            ...
-                          </span>
-                        );
-                      }
-
-                      if (!showPage) return null;
-
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentServicePage(pageNum)}
-                          style={{
-                            minWidth: '36px',
-                            height: '36px',
-                            borderRadius: '8px',
-                            border: pageNum === currentServicePage ? 'none' : '1px solid #d1d5db',
-                            background: pageNum === currentServicePage ? '#0ea5e9' : 'white',
-                            color: pageNum === currentServicePage ? 'white' : '#374151',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: pageNum === currentServicePage ? '600' : '500',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Next Button */}
-                  <button
-                    onClick={() => setCurrentServicePage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentServicePage === totalPages}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      background: currentServicePage === totalPages ? '#f3f4f6' : 'white',
-                      color: currentServicePage === totalPages ? '#9ca3af' : '#374151',
-                      cursor: currentServicePage === totalPages ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    التالي
-                    <FaArrowLeft style={{ fontSize: '12px' }} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Step 4: Choose Address */}
-        {currentBookingStep === 4 && (
-          <>
+        {/* Step 4: Choose Address - Only show if clinic and service are selected */}
+        {selectedClinic && selectedServiceIds.length > 0 && (
+        <div style={{ marginBottom: '32px' }}>
             <h3 className="content-title">اختر العنوان (اختياري)</h3>
             <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
               يمكنك تخطي هذه الخطوة والمتابعة للحجز
@@ -2141,12 +2162,12 @@ const NewBookingFilter = ({
                 </p>
               </div>
             )}
-          </>
+        </div>
         )}
 
-        {/* Step 5: Choose Date and Time */}
-        {currentBookingStep === 5 && (
-          <>
+        {/* Step 5: Choose Date and Time - Only show if clinic and service are selected */}
+        {selectedClinic && selectedServiceIds.length > 0 && (
+        <div style={{ marginBottom: '32px' }}>
             <h3 className="content-title">اختر التاريخ والوقت</h3>
             <p style={{ 
               textAlign: 'center', 
@@ -2368,68 +2389,28 @@ const NewBookingFilter = ({
                 </div>
               </div>
             </div>
-          </>
+        </div>
+        )}
+        </>
         )}
       </div>
 
-      {/* Footer Navigation */}
+      {/* Footer with Confirm Button Only */}
+      {!bookingSuccess && (
       <div className="booking-footer">
-        {currentBookingStep > 1 && (
-          <button 
-            className="booking-previous-btn"
-            onClick={() => setCurrentBookingStep(currentBookingStep - 1)}
-          >
-            السابق <FaArrowRight className="booking-previous-icon" />
-          </button>
-        )}
-        {currentBookingStep < 5 && (
-          <button 
-            className="next-btn"
-            onClick={() => setCurrentBookingStep(currentBookingStep + 1)}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              if (
-                !(currentBookingStep === 1 && !selectedClinic) &&
-                !(currentBookingStep === 2 && selectedServiceIds.length === 0)
-              ) {
-                setCurrentBookingStep(currentBookingStep + 1);
-              }
-            }}
-            disabled={
-              (currentBookingStep === 1 && !selectedClinic) ||
-              (currentBookingStep === 2 && selectedServiceIds.length === 0)
-              // الدكتور اختياري - تم إزالة التحقق من الخطوة 3
-              // Removed step 4 validation to allow skipping address selection
-            }
-            style={{
-              opacity: (
-                (currentBookingStep === 1 && !selectedClinic) ||
-                (currentBookingStep === 2 && selectedServiceIds.length === 0)
-              ) ? 0.5 : 1,
-              cursor: (
-                (currentBookingStep === 1 && !selectedClinic) ||
-                (currentBookingStep === 2 && selectedServiceIds.length === 0)
-              ) ? 'not-allowed' : 'pointer',
-              touchAction: 'manipulation'
-            }}
-          >
-            التالي <FaArrowLeft className="next-icon" />
-          </button>
-        )}
-        {currentBookingStep === 5 && (
-          <button 
-            className="confirm-btn"
-            onClick={completeBooking}
-            style={{ 
-              opacity: 1,
-              cursor: 'pointer'
-            }}
-          >
-            تأكيد الحجز <FaCheck className="confirm-icon" />
-          </button>
-        )}
+        <button 
+          className="confirm-btn"
+          onClick={completeBooking}
+          disabled={!userName.trim() || !userPhone.trim() || !selectedClinic || selectedServiceIds.length === 0}
+          style={{ 
+            opacity: (!userName.trim() || !userPhone.trim() || !selectedClinic || selectedServiceIds.length === 0) ? 0.5 : 1,
+            cursor: (!userName.trim() || !userPhone.trim() || !selectedClinic || selectedServiceIds.length === 0) ? 'not-allowed' : 'pointer'
+          }}
+        >
+          تأكيد الحجز <FaCheck className="confirm-icon" />
+        </button>
       </div>
-
+      )}
 
     </div>
   );

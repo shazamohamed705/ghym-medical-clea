@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { addToLocalCart } from '../../utils/cartUtils';
 import Navbar from '../Navbar/Navbar';
 import MainNavbar from '../Navbar/MainNavbar';
 import BannerCarousel from '../Banner/BannerCarousel';
 import Footer from '../footer/footer';
 import { getDoctorsData } from '../../API/apiService';
-
-const BASE_URL = 'https://ghaimcenter.com/laravel/storage/app/public';
+import { useToast } from '../Toast/ToastManager';
+import { useAuth } from '../../contexts/AuthContext';
+import { createUniqueSlug } from '../../utils/slugUtils';
 
 function DoctorsSection() {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useToast();
+  const { isAuthenticated } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,9 +21,162 @@ function DoctorsSection() {
   const [showModal, setShowModal] = useState(false);
   const [clinicInfo, setClinicInfo] = useState(null);
   const [loadingClinic, setLoadingClinic] = useState(false);
+  const [addingToCart, setAddingToCart] = useState({});
+  const imageRefs = useRef({});
 
   const handleBookingClick = (doctorId, clinicId) => {
     navigate('/booking', { state: { doctorId, clinicId } });
+  };
+
+  const handleAddToCart = async (doctor) => {
+    setAddingToCart(prev => ({ ...prev, [doctor.id]: true }));
+
+    try {
+      // Create flying image animation
+      const imageElement = imageRefs.current[doctor.id];
+      if (imageElement) {
+        const imageRect = imageElement.getBoundingClientRect();
+        
+        // Find cart icon in navbar
+        const cartIcon = document.querySelector('[data-cart-icon]');
+        if (!cartIcon) {
+          console.error('Cart icon not found');
+        }
+        
+        const cartRect = cartIcon ? cartIcon.getBoundingClientRect() : { top: 0, left: window.innerWidth };
+
+        // Create flying image clone
+        const flyingImage = imageElement.cloneNode(true);
+        flyingImage.style.position = 'fixed';
+        flyingImage.style.top = `${imageRect.top}px`;
+        flyingImage.style.left = `${imageRect.left}px`;
+        flyingImage.style.width = `${imageRect.width}px`;
+        flyingImage.style.height = `${imageRect.height}px`;
+        flyingImage.style.zIndex = '10000';
+        flyingImage.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        flyingImage.style.pointerEvents = 'none';
+        flyingImage.style.borderRadius = '1rem';
+        
+        document.body.appendChild(flyingImage);
+
+        // Trigger animation
+        setTimeout(() => {
+          flyingImage.style.top = `${cartRect.top}px`;
+          flyingImage.style.left = `${cartRect.left}px`;
+          flyingImage.style.width = '50px';
+          flyingImage.style.height = '50px';
+          flyingImage.style.opacity = '0.3';
+        }, 50);
+
+        // Remove flying image after animation
+        setTimeout(() => {
+          document.body.removeChild(flyingImage);
+        }, 900);
+      }
+
+      // Add to cart API call
+      const token = localStorage.getItem('authToken');
+
+      // إذا لم يكن هناك token، احفظ في localStorage
+      if (!token) {
+        addToLocalCart({
+          staff_id: doctor.id,
+          name: doctor.name,
+          ghaim_price: doctor.price,
+          image: doctor.image
+        });
+
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: doctor.image,
+            title: doctor.name,
+            price: doctor.price,
+            id: doctor.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/login')
+        });
+
+        setAddingToCart(prev => ({ ...prev, [doctor.id]: false }));
+        return;
+      }
+
+      console.log('📦 Adding doctor to cart:', doctor.id);
+      console.log('📦 Request body:', { carts: [{ staff_id: doctor.id }] });
+
+      const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          carts: [{ staff_id: doctor.id }]
+        })
+      });
+
+      console.log('📦 Response status:', response.status);
+      console.log('📦 Response headers:', response.headers.get('content-type'));
+
+      // Try to parse response as JSON
+      let result;
+      try {
+        const text = await response.text();
+        console.log('📦 Raw response:', text.substring(0, 500));
+        result = JSON.parse(text);
+        console.log('📦 Parsed response:', result);
+      } catch (parseError) {
+        console.error('❌ Failed to parse JSON:', parseError);
+        showError('حدث خطأ في الاتصال بالخادم');
+        return;
+      }
+
+      if (result.status === true || result.status === 'success') {
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: doctor.image,
+            title: doctor.name,
+            price: doctor.price,
+            id: doctor.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/dashboard?filter=NewBooking')
+        });
+        
+        // Update cart count in navbar
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+      } else {
+        const errorMsg = result.message || 'فشل إضافة الطبيب إلى السلة';
+        console.error('❌ API error:', errorMsg);
+        showError(errorMsg);
+      }
+    } catch (error) {
+      console.error('❌ Error adding to cart:', error);
+      showError('حدث خطأ في الاتصال بالخادم');
+    } finally {
+      setAddingToCart(prev => ({ ...prev, [doctor.id]: false }));
+    }
+  };
+  
+  const getMonthName = (month) => {
+    const months = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    return months[month - 1];
+  };
+  
+  const getDaysInMonth = (month, year) => {
+    return new Date(year, month, 0).getDate();
+  };
+  
+  const getFirstDayOfMonth = (month, year) => {
+    return new Date(year, month - 1, 1).getDay();
   };
 
   const handleInfoClick = async (doctor) => {
@@ -184,11 +341,15 @@ function DoctorsSection() {
                 }}
               >
                 {/* الصورة */}
-                <div className="relative w-full h-80 overflow-hidden bg-gray-100 rounded-t-xl">
+                <div 
+                  className="relative w-full h-80 overflow-hidden bg-gray-100 rounded-t-xl cursor-pointer"
+                  onClick={() => navigate(`/doctor/${createUniqueSlug(doctor.name, doctor.id)}`)}
+                >
                   <img
+                    ref={(el) => imageRefs.current[doctor.id] = el}
                     src={doctor.image}
                     alt={doctor.alt}
-                    className="w-full h-full object-cover object-center"
+                    className="w-full h-full object-cover object-center transition-transform hover:scale-105"
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src = '/imge.png';
@@ -197,8 +358,11 @@ function DoctorsSection() {
                   
                   {/* زر المعلومات */}
                   <button
-                    onClick={() => handleInfoClick(doctor)}
-                    className="absolute top-3 right-3 w-8 h-8 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleInfoClick(doctor);
+                    }}
+                    className="absolute top-3 right-3 w-8 h-8 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 z-10"
                     title="معلومات الطبيب"
                   >
                     <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -229,11 +393,26 @@ function DoctorsSection() {
                   </p>
                   
                   <button
-                    onClick={() => handleBookingClick(doctor.id, doctor.clinicId)}
-                    className="w-full py-3 px-6 bg-gradient-to-r from-[#0171bd] to-[#015a99] text-white rounded-2xl font-bold text-lg hover:from-[#015a99] hover:to-[#013d73] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 mt-auto relative z-10 cursor-pointer"
+                    onClick={() => handleAddToCart(doctor)}
+                    disabled={addingToCart[doctor.id]}
+                    className="w-full py-3 px-6 bg-gradient-to-r from-[#1F97C1] to-[#1a85ad] text-white rounded-2xl font-bold text-lg hover:from-[#1a85ad] hover:to-[#156f93] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 mt-auto relative z-10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     style={{ fontFamily: 'Almarai' }}
                   >
-                    احجز الآن
+                    {addingToCart[doctor.id] ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>جاري الإضافة...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="9" cy="21" r="1"/>
+                          <circle cx="20" cy="21" r="1"/>
+                          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                        </svg>
+                        <span>أضف للسلة</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

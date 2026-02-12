@@ -13,6 +13,7 @@ import Contact from './components/Contact/Contact';
 import Booking from './components/Booking/Booking';
 import About from './components/About/About';
 import DoctorsSection from './components/Doctors/DoctorsSection';
+import DoctorDetails from './components/Doctors/DoctorDetails';
 import OffersSection from './components/Offers/OffersSection';
 import ServicesSection from './components/Services/ServicesSection';
 import Login from './components/Login/Login';
@@ -94,6 +95,7 @@ function App() {
             <Route path="/offers" element={<OffersSection />} />
             <Route path="/services" element={<ServicesSection />} />
             <Route path="/doctors" element={<DoctorsSection />} />
+            <Route path="/doctor/:doctorSlug" element={<DoctorDetails />} />
             <Route path="/blogs" element={<BlogsList />} />
             <Route path="/blogid/:blogId" element={<BlogID />} />
             <Route path="/blog/:blogId" element={<BlogID />} />
@@ -118,17 +120,15 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/category" element={<Category />} />
+            <Route path="/category/:categoryName/:categoryId" element={<Category />} />
+            <Route path="/clinic/:clinicSlug" element={<Category />} />
             <Route path="/search" element={<SearchResults />} />
-            <Route path="/service/:clinicId/:serviceId" element={<ServiceDetails />} />
+            <Route path="/service/:serviceSlug" element={<ServiceDetails />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/return-policy" element={<ReturnPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/laser-guidelines" element={<LaserGuidelines />} />
-            <Route path="/cart" element={
-              <ProtectedRoute>
-                <Cart />
-              </ProtectedRoute>
-            } />
+            <Route path="/cart" element={<Cart />} />
           </Routes>
           
           {/* زر الواتساب الطائر - يظهر في كل الصفحات */}

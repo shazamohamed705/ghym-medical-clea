@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import MainLayout from '../../layouts/mainlayouts';
 import WelcomeSection from './sections/WelcomeSection';
 import ServicesSection from './sections/ServicesSection';
@@ -9,6 +9,10 @@ import WhyChooseSection from './sections/WhyChooseSection';
 import TestimonialsSection from './sections/TestimonialsSection';
 import BlogSection from './sections/BlogSection';
 function Home() {
+  useEffect(() => {
+    document.title = 'مجمع غيم الطبي - الرئيسية';
+  }, []);
+
   return (
     <MainLayout>
 <WelcomeSection/>

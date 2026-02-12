@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createUniqueSlug } from '../../../utils/slugUtils';
 import { getClinicsServices } from '../../../API/apiService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useToast } from '../../Toast/ToastManager';
+import { addToLocalCart } from '../../../utils/cartUtils';
 
 function OffersSection() {
   const navigate = useNavigate();
@@ -33,39 +35,99 @@ function OffersSection() {
   const [addingToCart, setAddingToCart] = useState({});
 
   // دالة للتوجيه إلى صفحة التفاصيل
-  const handleServiceClick = (clinicId, serviceId) => {
-    navigate(`/service/${clinicId}/${serviceId}`);
+  const handleServiceClick = (service) => {
+    const slug = createUniqueSlug(service.title_ar || service.title, service.id);
+    navigate(`/service/${slug}`);
   };
 
   // دالة للتوجيه عند النقر على زر الحجز
-  const handleBookingClick = (e, clinicId, serviceId) => {
+  const handleBookingClick = (e, service) => {
     e.stopPropagation();
-    navigate(`/service/${clinicId}/${serviceId}`);
+    const slug = createUniqueSlug(service.title_ar || service.title, service.id);
+    navigate(`/service/${slug}`);
   };
 
   // دالة لإضافة خدمة للسلة
-  const handleAddToCart = async (e, service) => {
+  const handleAddToCart = async (e, service, imageElement) => {
     e.stopPropagation(); // منع فتح صفحة التفاصيل
-    
-    if (!isAuthenticated()) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     const token = localStorage.getItem('authToken');
-    if (!token) {
-      showError('يرجى تسجيل الدخول أولاً');
-      navigate('/login');
-      return;
-    }
 
     setAddingToCart(prev => ({ ...prev, [service.id]: true }));
 
     try {
-      // إضافة للسلة بدون staff_id (اختياري)
+      // Create flying image animation
+      if (imageElement) {
+        const imageRect = imageElement.getBoundingClientRect();
+        
+        // Find cart icon in navbar
+        const cartIcon = document.querySelector('[data-cart-icon]');
+        const cartRect = cartIcon ? cartIcon.getBoundingClientRect() : { top: 0, left: window.innerWidth };
+
+        // Create flying image clone
+        const flyingImage = imageElement.cloneNode(true);
+        flyingImage.style.position = 'fixed';
+        flyingImage.style.top = `${imageRect.top}px`;
+        flyingImage.style.left = `${imageRect.left}px`;
+        flyingImage.style.width = `${imageRect.width}px`;
+        flyingImage.style.height = `${imageRect.height}px`;
+        flyingImage.style.zIndex = '10000';
+        flyingImage.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        flyingImage.style.pointerEvents = 'none';
+        flyingImage.style.borderRadius = '0.5rem';
+        
+        document.body.appendChild(flyingImage);
+
+        // Trigger animation
+        setTimeout(() => {
+          flyingImage.style.top = `${cartRect.top}px`;
+          flyingImage.style.left = `${cartRect.left}px`;
+          flyingImage.style.width = '50px';
+          flyingImage.style.height = '50px';
+          flyingImage.style.opacity = '0.3';
+        }, 50);
+
+        // Remove flying image after animation
+        setTimeout(() => {
+          document.body.removeChild(flyingImage);
+        }, 900);
+      }
+
+      // Get service image
+      const serviceImage = service.images?.[0]?.image || service.image || '/1.png';
+
+      // إذا لم يكن هناك token، احفظ في localStorage
+      if (!token) {
+        addToLocalCart({
+          service_id: service.id,
+          title_ar: service.title_ar || service.title,
+          title: service.title,
+          price: service.price,
+          image: serviceImage,
+          images: service.images,
+          about_ar: service.about_ar
+        });
+
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: serviceImage,
+            title: service.title_ar || service.title,
+            price: service.price,
+            id: service.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/login')
+        });
+
+        setAddingToCart(prev => ({ ...prev, [service.id]: false }));
+        return;
+      }
+
+      // إضافة للسلة عبر API
       const cartData = {
-        service_id: service.id
+        carts: [{ service_id: service.id }]
       };
 
       const response = await fetch('https://ghaimcenter.com/laravel/api/user/cart', {
@@ -79,15 +141,24 @@ function OffersSection() {
 
       const result = await response.json();
       console.log('🛒 Add to cart response:', result);
-      console.log('🛒 Response status:', result.status, 'Type:', typeof result.status);
 
       if (response.ok && (result.status === true || result.status === 'success')) {
-        console.log('✅ Calling showSuccess');
-        showSuccess('تم إضافة الخدمة للسلة بنجاح');
+        // Show custom cart success toast
+        showSuccess('تمت الإضافة إلى سلة التسوق', {
+          isCartToast: true,
+          serviceData: {
+            image: serviceImage,
+            title: service.title_ar || service.title,
+            price: service.price,
+            id: service.id
+          },
+          onViewCart: () => navigate('/cart'),
+          onCheckout: () => navigate('/dashboard?filter=NewBooking')
+        });
+        
         // تحديث عدد العناصر في السلة
         window.dispatchEvent(new CustomEvent('cartUpdated'));
       } else {
-        console.log('❌ Calling showError');
         showError(result.message || 'حدث خطأ أثناء إضافة الخدمة للسلة');
       }
     } catch (error) {
@@ -238,16 +309,17 @@ function OffersSection() {
             filteredServices.map((service) => (
               <div
                 key={service.id}
-                onClick={() => handleServiceClick(service.clinics_id, service.id)}
+                onClick={() => handleServiceClick(service)}
                 className="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 flex-shrink-0 scroll-snap-align-start cursor-pointer flex flex-col"
                 style={{ width: '280px', height: '360px' }}
               >
               {/* الصورة */}
-                <div className="w-full h-48 overflow-hidden flex-shrink-0">
+                <div className="w-full h-48 overflow-hidden flex-shrink-0 bg-gray-100 flex items-center justify-center">
                   <img
                     src={service.images && service.images.length > 0 ? service.images[0].image : '/1.png'}
                     alt={service.title_ar || service.title}
-                    className="w-full h-full object-cover object-center"
+                    className="w-full h-full object-contain service-image"
+                    style={{ transform: 'scale(1.15, 1) scaleX(1.6)' }}
                     onError={(e) => {
                       e.target.src = '/1.png'; // صورة افتراضية عند فشل التحميل
                     }}
@@ -312,7 +384,10 @@ function OffersSection() {
                         </svg>
                   </span>
                   <button
-                      onClick={(e) => handleAddToCart(e, service)}
+                      onClick={(e) => {
+                        const img = e.currentTarget.closest('.bg-white').querySelector('.service-image');
+                        handleAddToCart(e, service, img);
+                      }}
                       disabled={addingToCart[service.id]}
                       className="text-blue-500 border border-blue-200 px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-50 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{

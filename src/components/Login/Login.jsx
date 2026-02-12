@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaUser, FaCheck, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
+import { syncLocalCartWithAPI } from '../../utils/cartUtils';
+import Navbar from '../Navbar/Navbar';
+import MainNavbar from '../Navbar/MainNavbar';
+import Footer from '../footer/footer';
 import '../Register/GhymAuthStyles.css';
 
 const GhymAuthLogin = () => {
@@ -24,6 +28,10 @@ const GhymAuthLogin = () => {
   const [logoLoading, setLogoLoading] = useState(true);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = 'تسجيل الدخول - مجمع غيم الطبي';
+  }, []);
 
   // جلب لوجو الموقع
   useEffect(() => {
@@ -209,6 +217,18 @@ const GhymAuthLogin = () => {
           phone: result.data.user.phone_number,
           id: result.data.user.id
         }, result.data.token);
+
+        // مزامنة السلة المحلية مع API
+        try {
+          const syncResult = await syncLocalCartWithAPI(result.data.token);
+          console.log('🔄 Cart sync result:', syncResult);
+          
+          if (syncResult.success && syncResult.synced > 0) {
+            console.log(`✅ تم مزامنة ${syncResult.synced} عنصر من السلة المحلية`);
+          }
+        } catch (syncError) {
+          console.error('❌ Error syncing cart:', syncError);
+        }
 
         // Show success popup then navigate
         setCurrentStep('success');
@@ -407,39 +427,11 @@ const GhymAuthLogin = () => {
   );
 
   return (
-    <div className="ghym-auth-container">
-      {/* Header Section */}
-      <header className="ghym-auth-header">
-        <div className="ghym-auth-header-content">
-          {/* Logo Section */}
-          <div className="ghym-auth-logo-section">
-            {logoLoading ? (
-              <div className="ghym-auth-logo-loading">
-                <div className="spinner"></div>
-              </div>
-            ) : (
-              <Link to="/">
-                <img 
-                  src={websiteLogo || "/logoo.png"} 
-                  alt="مجمع غيم الطبي" 
-                  className="ghym-auth-logo-img"
-                  style={{ cursor: 'pointer' }}
-                />
-              </Link>
-            )}
-          </div>
-
-          {/* Back Button */}
-          <button 
-            className="ghym-auth-back-btn"
-            onClick={() => navigate(-1)}
-            aria-label="العودة"
-          >
-            <FaArrowLeft className="ghym-auth-back-icon" />
-          </button>
-        </div>
-      </header>
-
+    <>
+      <Navbar />
+      <MainNavbar />
+      
+      <div className="ghym-auth-container">
       {/* Main Content */}
       <main className="ghym-auth-main">
         <div className="ghym-auth-card">
@@ -524,6 +516,9 @@ const GhymAuthLogin = () => {
         </div>
       )}
     </div>
+    
+    <Footer />
+    </>
   );
 };
 
